@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Logs
+*.log
+
+# Cookies & Sensitive Data
+*cookies.txt
+*.cookies
+config.yaml
+!config.example.yaml
+
+# Downloaded Content
+downloads/
+
+# OS
+.DS_Store
+.idea/
+.vscode/
+
+# Project specific
+kk_app.js
