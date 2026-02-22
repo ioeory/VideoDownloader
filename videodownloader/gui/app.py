@@ -23,14 +23,25 @@ class TextHandler(logging.Handler):
     def __init__(self, text_widget):
         super().__init__()
         self.text_widget = text_widget
+        # Configure color tags for logging levels
+        self.text_widget.tag_config("ERROR", foreground="#FF4C4C")   # Red
+        self.text_widget.tag_config("WARNING", foreground="#FFB74D") # Orange
+        self.text_widget.tag_config("INFO", foreground="#E0E0E0")    # White/Gray
+        self.text_widget.tag_config("DEBUG", foreground="#90A4AE")   # Blueish Gray
 
     def emit(self, record):
         msg = self.format(record)
+        level = record.levelname
+        
         def append():
             self.text_widget.configure(state="normal")
-            self.text_widget.insert("end", msg + "\n")
+            if level in ["ERROR", "WARNING", "INFO", "DEBUG"]:
+                self.text_widget.insert("end", msg + "\n", level)
+            else:
+                self.text_widget.insert("end", msg + "\n")
             self.text_widget.see("end")
             self.text_widget.configure(state="disabled")
+            
         try:
             self.text_widget.after(0, append)
         except Exception:
@@ -499,9 +510,24 @@ class VideoDownloaderApp(ctk.CTk):
                 log.info(f"✅ 队列执行完毕！成功 {success_count}，部分/瑕疵 {partial_count}，完全失败 {len(tasks) - success_count - partial_count}。")
                 if failed_tasks:
                     log.warning(f"⚠️ 以下任务未能完整下载，请检查其页面状态：")
+                    error_msg_lines = []
                     for ftask in failed_tasks:
                         log.warning(f"  - {ftask}")
-                log.info("=" * 60)
+                        error_msg_lines.append(f"• {ftask}")
+                    log.info("=" * 60)
+                    
+                    # 弹窗强提示用户
+                    max_display = 15
+                    display_text = "\n".join(error_msg_lines[:max_display])
+                    if len(error_msg_lines) > max_display:
+                        display_text += f"\n...以及另外 {len(error_msg_lines) - max_display} 个任务"
+                        
+                    self.after(0, lambda: messagebox.showwarning(
+                        "有任务未能成功下载",
+                        f"在刚才的批量队列中，有 {len(error_msg_lines)} 个任务无法完整下载：\n\n{display_text}\n\n详情请查看左侧日志区域。"
+                    ))
+                else:
+                    log.info("=" * 60)
 
         except Exception as e:
             if not self.is_stopped:
