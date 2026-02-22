@@ -370,14 +370,22 @@ class VideoDownloaderApp(ctk.CTk):
         # yt-dlp logger adapter
         class YtdlpLogger:
             def debug(self, msg):
-                if logging.getLogger().level <= logging.DEBUG:
-                    log.debug(msg)
+                # For compatibility with youtube-dl, both debug and info are passed into debug
+                if msg.startswith('[debug] '):
+                    if logging.getLogger().level <= logging.DEBUG:
+                        log.debug(msg)
+                else:
+                    self.info(msg)
+                    
             def info(self, msg):
                 # ignore noise unless in DEBUG mode
                 if logging.getLogger().level > logging.DEBUG:
-                    if "frag" in msg.lower() or "eta" in msg.lower() or "[download]" in msg:
+                    if "frag" in msg.lower() or "eta" in msg.lower() or "downloading webpage" in msg.lower():
+                        return
+                    if "[download]" in msg and "Destination:" not in msg and "Finished" not in msg:
                         return
                 log.info(msg)
+                
             def warning(self, msg):
                 log.warning(msg)
                 # 针对 Node.js 缺失检测的强提醒
