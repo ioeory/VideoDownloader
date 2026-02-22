@@ -5,6 +5,8 @@ from tkinter import filedialog, messagebox
 import threading
 import logging
 import sys
+import os
+import json
 from pathlib import Path
 
 # Videodownloader imports
@@ -104,6 +106,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.current_task_index = 0
         self.total_tasks_count = 0
         self.completed_tasks_count = 0
+        self.downloaded_files_count = 0
         self.pause_event = threading.Event()
         self.pause_event.set() # Set initial state to not paused
         self.current_lang = "en"
@@ -403,9 +406,74 @@ class VideoDownloaderApp(ctk.CTk):
         self.on_loglevel_change(self.loglevel_var.get())
         
         self.update_ui_texts()
+        
+        # Load user configuration
+        self.config_filepath = Path.home() / ".videodownloader_gui.json"
+        self.load_config()
         self.on_platform_change(self.platform_var.get())
         
         log.info(self.t("welcome"))
+        
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def load_config(self):
+        try:
+            if self.config_filepath.exists():
+                with open(self.config_filepath, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    
+                if "lang" in config: self.current_lang = config["lang"]
+                if "platform" in config: self.platform_var.set(config["platform"])
+                if "quality" in config: self.quality_var.set(config["quality"])
+                if "outdir" in config: self.outdir_var.set(config["outdir"])
+                if "cookie_src" in config: self.cookie_src_var.set(config["cookie_src"])
+                if "cookie_val" in config: self.cookie_val_var.set(config["cookie_val"])
+                if "loglevel" in config: self.loglevel_var.set(config["loglevel"])
+                if "threads" in config: self.threads_var.set(config["threads"])
+                if "url" in config: self.entry_url.insert(0, config["url"])
+                if "subtitle" in config: self.subtitle_var.set(config["subtitle"])
+                if "playlist_items" in config: self.playlist_items_var.set(config["playlist_items"])
+                if "weeks" in config: self.weeks_var.set(config["weeks"])
+                
+                # Update UI state for cookies
+                if "cookie_src" in config:
+                    self.on_cookie_src_change(config["cookie_src"])
+                    self.cookie_val_var.set(config.get("cookie_val", ""))
+                
+                self.on_loglevel_change(self.loglevel_var.get())
+                self.update_ui_texts()
+        except Exception as e:
+            log.warning(f"Failed to load config: {e}")
+
+    def save_config(self):
+        try:
+            config = {
+                "lang": getattr(self, "current_lang", "en"),
+                "platform": self.platform_var.get(),
+                "quality": self.quality_var.get(),
+                "outdir": self.outdir_var.get(),
+                "cookie_src": self.cookie_src_var.get(),
+                "cookie_val": self.cookie_val_var.get(),
+                "loglevel": self.loglevel_var.get(),
+                "threads": self.threads_var.get(),
+                "url": self.entry_url.get(),
+                "subtitle": self.subtitle_var.get(),
+                "playlist_items": self.playlist_items_var.get(),
+                "weeks": self.weeks_var.get()
+            }
+            with open(self.config_filepath, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            log.warning(f"Failed to save config: {e}")
+
+    def on_closing(self):
+        # Stop download if currently downloading
+        self.is_stopped = True
+        self.pause_event.set()
+        
+        # Save configs
+        self.save_config()
+        self.destroy()
 
 
     def t(self, key):
@@ -565,6 +633,13 @@ class VideoDownloaderApp(ctk.CTk):
 
         if d['status'] == 'downloading':
             try:
+                info = d.get('info_dict', {})
+                p_idx = info.get('playlist_autonumber') or info.get('playlist_index')
+                p_count = info.get('n_entries') or info.get('playlist_count')
+                
+                display_idx = p_idx if p_idx is not None else self.current_task_index
+                display_total = p_count if p_count is not None else self.total_tasks_count
+                
                 total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
                 downloaded = d.get('downloaded_bytes', 0)
                 speed = d.get('_speed_str', 'N/A').strip()
@@ -582,16 +657,24 @@ class VideoDownloaderApp(ctk.CTk):
                         concurrent = int(self.threads_var.get())
                         if concurrent <= 1:
                             self.progress_var.set(pct)
-                            status_text = f"[{self.current_task_index}/{self.total_tasks_count}] {self.t('downloading')}{filename}{self.t('speed')}{speed}"
+                            status_text = f"[{display_idx}/{display_total}] {self.t('downloading')}{filename}{self.t('speed')}{speed}"
                             self.lbl_status.configure(text=status_text)
                         
                 self.after(0, update_ui)
             except Exception:
                 pass
         elif d['status'] == 'finished':
+            self.downloaded_files_count += 1
+            info = d.get('info_dict', {})
+            p_idx = info.get('playlist_autonumber') or info.get('playlist_index')
+            p_count = info.get('n_entries') or info.get('playlist_count')
+            
+            display_idx = p_idx if p_idx is not None else self.current_task_index
+            display_total = p_count if p_count is not None else self.total_tasks_count
+            
             filename = Path(d.get('filename', '')).name
             if int(self.threads_var.get()) <= 1:
-                self.after(0, lambda: self.lbl_status.configure(text=f"[{self.current_task_index}/{self.total_tasks_count}] {self.t('finished')}{filename}{self.t('processing')}"))
+                self.after(0, lambda: self.lbl_status.configure(text=f"[{display_idx}/{display_total}] {self.t('finished')}{filename}{self.t('processing')}"))
                 self.after(0, lambda: self.progress_var.set(1.0))
 
     def start_download(self):
@@ -619,6 +702,7 @@ class VideoDownloaderApp(ctk.CTk):
         
     def _download_thread(self, url):
         self.completed_tasks_count = 0
+        self.downloaded_files_count = 0
         try:
             log.info("=" * 60)
             log.info(f"{self.t('log_start')}{url}")
