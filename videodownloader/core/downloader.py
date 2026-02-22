@@ -113,6 +113,16 @@ def download_with_ytdlp(
 
     # 启用 Node.js 运行时 + EJS challenge solver（解决 Cookie 模式下 YouTube 签名校验问题）
     import shutil
+    import sys
+    import os
+    
+    # 兼容 PyInstaller 打包时解压 Node.js 的目录查找
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        meipass_node = Path(sys._MEIPASS) / ("node.exe" if os.name == 'nt' else "node")
+        if meipass_node.exists():
+            # 将 _MEIPASS 放到 PATH 最前面，确保 yt-dlp 能找到打包自带的 node
+            os.environ["PATH"] = str(sys._MEIPASS) + os.pathsep + os.environ.get("PATH", "")
+
     if shutil.which("node"):
         ydl_opts["js_runtimes"] = {"node": {}}
         ydl_opts["remote_components"] = ["ejs:github"]
