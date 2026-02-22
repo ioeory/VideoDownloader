@@ -197,7 +197,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "paused_stat": "已暂停: ",
                 "downloading": "正在下载: ",
                 "speed": "   |   速度: ",
-                "concurrent_dl": "并发下载中 (多线程活动)... 请查看左侧日志",
+                "concurrent_dl": "并发下载中 (多线程活动)... 请查看上方日志",
                 "processing": "，正在合并处理...",
                 "finished": "已下载完成: ",
                 "preparing": "准备下载...",
@@ -254,7 +254,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.lbl_platform.grid(row=0, column=0, padx=10, pady=10, sticky="w")
         
         self.platform_var = ctk.StringVar(value="Generic (YouTube/Bilibili etc.)")
-        self.combo_platform = ctk.CTkComboBox(self.frame_config, variable=self.platform_var,
+        self.combo_platform = ctk.CTkComboBox(self.frame_config, variable=self.platform_var, state="readonly",
             values=["Generic (YouTube/Bilibili etc.)", "Harvard (CS50)", "DeepLearning.AI", "Coursera", "KodeKloud", "Skills Google"],
             command=self.on_platform_change)
         self.combo_platform.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
@@ -264,7 +264,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.lbl_quality.grid(row=0, column=2, padx=10, pady=10, sticky="w")
         
         self.quality_var = ctk.StringVar(value="best")
-        self.combo_quality = ctk.CTkComboBox(self.frame_config, variable=self.quality_var,
+        self.combo_quality = ctk.CTkComboBox(self.frame_config, variable=self.quality_var, state="readonly",
             values=["best", "4k", "1080p", "720p", "480p", "audio"])
         self.combo_quality.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
         
@@ -296,7 +296,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.lbl_cookie.grid(row=3, column=0, padx=10, pady=10, sticky="w")
         
         self.cookie_src_var = ctk.StringVar(value="None (No login)")
-        self.combo_cookie_src = ctk.CTkComboBox(self.frame_config, variable=self.cookie_src_var,
+        self.combo_cookie_src = ctk.CTkComboBox(self.frame_config, variable=self.cookie_src_var, state="readonly",
             values=[self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')],
             command=self.on_cookie_src_change)
         self.combo_cookie_src.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
@@ -311,7 +311,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.lbl_loglevel.grid(row=4, column=0, padx=10, pady=10, sticky="w")
         
         self.loglevel_var = ctk.StringVar(value="INFO")
-        self.combo_loglevel = ctk.CTkComboBox(self.frame_config, variable=self.loglevel_var,
+        self.combo_loglevel = ctk.CTkComboBox(self.frame_config, variable=self.loglevel_var, state="readonly",
             values=["DEBUG", "INFO", "WARNING", "ERROR"],
             command=self.on_loglevel_change)
         self.combo_loglevel.grid(row=4, column=1, padx=10, pady=10, sticky="ew")
@@ -321,7 +321,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.lbl_threads.grid(row=4, column=2, padx=10, pady=10, sticky="w")
         
         self.threads_var = ctk.StringVar(value="1")
-        self.combo_threads = ctk.CTkComboBox(self.frame_config, variable=self.threads_var,
+        self.combo_threads = ctk.CTkComboBox(self.frame_config, variable=self.threads_var, state="readonly",
             values=["1", "2", "3", "4", "5"])
         self.combo_threads.grid(row=4, column=3, padx=10, pady=10, sticky="ew")
 
@@ -837,7 +837,7 @@ class VideoDownloaderApp(ctk.CTk):
                         
                     self.after(0, lambda: messagebox.showwarning(
                         "Some tasks failed to download",
-                        f"在刚才的批量队列中，有 {len(error_msg_lines)} 个任务无法完整下载：\n\n{display_text}\n\n详情请查看左侧日志区域。"
+                        f"在刚才的批量队列中，有 {len(error_msg_lines)} 个任务无法完整下载：\n\n{display_text}\n\n详情请查看上方日志区域。"
                     ))
                 else:
                     log.info("=" * 60)
