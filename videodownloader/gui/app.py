@@ -1,4 +1,3 @@
-```python
 import customtkinter as ctk
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor, as_completed
