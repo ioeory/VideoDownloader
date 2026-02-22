@@ -48,6 +48,52 @@ class TextHandler(logging.Handler):
         except Exception:
             pass
 
+def enable_undo(entry, string_var=None):
+    if not isinstance(entry, ctk.CTkEntry):
+        return
+    if not string_var:
+        string_var = ctk.StringVar()
+        entry.configure(textvariable=string_var)
+        
+    stack = [""]
+    ptr = [0]
+    
+    def on_change(*args):
+        val = string_var.get()
+        if getattr(entry, '_is_undoing', False):
+            return
+        if not stack or stack[ptr[0]] != val:
+            del stack[ptr[0]+1:]
+            stack.append(val)
+            ptr[0] += 1
+            if len(stack) > 50:
+                stack.pop(0)
+                ptr[0] -= 1
+
+    def on_undo(event):
+        if ptr[0] > 0:
+            entry._is_undoing = True
+            ptr[0] -= 1
+            val = stack[ptr[0]]
+            string_var.set(val)
+            entry._is_undoing = False
+        return "break"
+
+    def on_redo(event):
+        if ptr[0] < len(stack) - 1:
+            entry._is_undoing = True
+            ptr[0] += 1
+            val = stack[ptr[0]]
+            string_var.set(val)
+            entry._is_undoing = False
+        return "break"
+
+    string_var.trace_add("write", on_change)
+    entry.bind("<Control-z>", on_undo, add="+")
+    entry.bind("<Control-Z>", on_undo, add="+")
+    entry.bind("<Control-y>", on_redo, add="+")
+    entry.bind("<Control-Y>", on_redo, add="+")
+
 class VideoDownloaderApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -57,6 +103,123 @@ class VideoDownloaderApp(ctk.CTk):
         self.is_stopped = False
         self.pause_event = threading.Event()
         self.pause_event.set() # Set initial state to not paused
+        self.current_lang = "en"
+        self.i18n = {
+            "en": {
+                "title": "VideoDownloader - Universal Video Downloader",
+                "url": "Video/Course URL:",
+                "platform": "Platform:",
+                "quality": "Max Quality:",
+                "outdir": "Output Dir:",
+                "browse": "Browse...",
+                "cookies": "Cookies:",
+                "loglevel": "Log Level:",
+                "threads": "Concurrency (Threads):",
+                "waiting": "Waiting...",
+                "start": "Start Download",
+                "pause": "Pause",
+                "resume": "Resume",
+                "stop": "Stop",
+                "playlist_range": "Playlist Items:",
+                "playlist_ph": "e.g. 1-25 or 1,3,5 (blank for all)",
+                "subtitles": "Download Subtitles",
+                "harvard_info": "Info: Harvard mode auto-detects playlists and downloads videos, PDFs, and assets.",
+                "weeks": "Specific Week(s):",
+                "weeks_ph": "e.g. 1 2 (space separated, blank for all)",
+                "welcome": "Welcome to VideoDownloader GUI! Stuttering during startup is normal.",
+                "lang_toggle": "Language: ZH",
+                "cookie_none": "None (No login)",
+                "cookie_chrome": "Chrome Browser",
+                "cookie_edge": "Edge Browser",
+                "cookie_firefox": "Firefox Browser",
+                "cookie_brave": "Brave Browser",
+                "cookie_clipboard": "Clipboard (Paste text)",
+                "cookie_file": "Select cookies.txt...",
+                "warning": "Warning",
+                "enter_url": "Please enter URL or Course Slug",
+                "paused_stat": "Paused: ",
+                "downloading": "Downloading: ",
+                "speed": "   |   Speed: ",
+                "concurrent_dl": "Concurrent downloading... Check logs",
+                "processing": ", processing...",
+                "finished": "Finished: ",
+                "preparing": "Preparing...",
+                "stopping": "Force stopping, please wait...",
+                "confirm_title": "Confirmation",
+                "confirm_stop": "Stop current download and cancel queued tasks?",
+                "log_start": "🚀 Starting download task: ",
+                "log_cookie_try": "Trying to get Cookie from ",
+                "log_cookie_succ": "Successfully extracted ",
+                "log_cookie_succ2": " Cookie items.",
+                "log_cookie_fail": "Failed to get Cookie: ",
+                "log_no_task": "No download tasks could be parsed.",
+                "log_found_tasks": "Found ",
+                "log_found_tasks2": " sub-tasks, preparing download...",
+                "log_start_sub": "Starting task ",
+                "log_terminated": "Task terminated: ",
+                "log_abort": "Queue execution aborted",
+                "log_success": "✅ Queue executed! Tasks Success: {}, Failed: {}. Processed {} media files/segments.",
+                "log_partial": "Partial: ",
+                "log_failed": "Failed: "
+            },
+            "zh": {
+                "title": "VideoDownloader - 通用视频下载器",
+                "url": "视频/课程 URL:",
+                "platform": "下载平台:",
+                "quality": "最高画质:",
+                "outdir": "输出目录:",
+                "browse": "浏览...",
+                "cookies": "Cookies 来源:",
+                "loglevel": "日志级别:",
+                "threads": "并发线程:",
+                "waiting": "等待下载...",
+                "start": "开始下载",
+                "pause": "暂停",
+                "resume": "继续",
+                "stop": "停止",
+                "playlist_range": "播放列表范围:",
+                "playlist_ph": "如 1-25 或 1,3,5 (留空: 全部)",
+                "subtitles": "下载字幕",
+                "harvard_info": "说明: Harvard 模式支持自动探测播放列表。全自动提取 YouTube、直链、PDF。",
+                "weeks": "指定 Week(s):",
+                "weeks_ph": "如 1 2 (空格分隔, 留空: 全部)",
+                "welcome": "欢迎使用 VideoDownloader GUI！启动期如果有卡顿属于正常现象。",
+                "lang_toggle": "Language: EN",
+                "cookie_none": "无 (免登录)",
+                "cookie_chrome": "Chrome 浏览器",
+                "cookie_edge": "Edge 浏览器",
+                "cookie_firefox": "Firefox 浏览器",
+                "cookie_brave": "Brave 浏览器",
+                "cookie_clipboard": "剪贴板 (粘贴文本)",
+                "cookie_file": "选择 cookies.txt...",
+                "warning": "警告",
+                "enter_url": "请输入 URL 或 Course Slug",
+                "paused_stat": "已暂停: ",
+                "downloading": "正在下载: ",
+                "speed": "   |   速度: ",
+                "concurrent_dl": "并发下载中 (多线程活动)... 请查看左侧日志",
+                "processing": "，正在合并处理...",
+                "finished": "已下载完成: ",
+                "preparing": "准备下载...",
+                "stopping": "正在强制停止，请稍候...",
+                "confirm_title": "确认",
+                "confirm_stop": "确定要停止当前下载(会取消后续任务)吗？",
+                "log_start": "🚀 开始下载任务: ",
+                "log_cookie_try": "正在尝试获取 Cookie ",
+                "log_cookie_succ": "成功获取到 ",
+                "log_cookie_succ2": " 条记录。",
+                "log_cookie_fail": "获取 Cookie 失败: ",
+                "log_no_task": "没有解析出任何下载任务。",
+                "log_found_tasks": "发现 ",
+                "log_found_tasks2": " 个子任务，准备下载...",
+                "log_start_sub": "开始执行任务 ",
+                "log_terminated": "任务已终止: ",
+                "log_abort": "队列执行已中止",
+                "log_success": "✅ 队列执行完毕！成功任务 {}，失败 {}。本次共已下载或合并 {} 个媒体分段/文件。",
+                "log_partial": "瑕疵 ",
+                "log_failed": "失败 "
+            }
+        }
 
         self.title("VideoDownloader - Universal Video Downloader")
         self.geometry("820x720")
@@ -72,11 +235,14 @@ class VideoDownloaderApp(ctk.CTk):
         self.frame_url.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
         self.frame_url.grid_columnconfigure(1, weight=1)
         
-        self.lbl_url = ctk.CTkLabel(self.frame_url, text="Video/Course URL:")
+        self.lbl_url = ctk.CTkLabel(self.frame_url, text=self.t("url"))
         self.lbl_url.grid(row=0, column=0, padx=10, pady=10)
         
         self.entry_url = ctk.CTkEntry(self.frame_url, placeholder_text="https://...")
         self.entry_url.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        enable_undo(self.entry_url)
+        self.btn_lang = ctk.CTkButton(self.frame_url, text=self.t("lang_toggle"), width=120, command=self.toggle_language, fg_color="#455A64", hover_color="#37474F")
+        self.btn_lang.grid(row=0, column=2, padx=10, pady=10)
 
         # 2. 核心配置区 (平台 & 动态配置 & 环境)
         self.frame_config = ctk.CTkFrame(self)
@@ -84,7 +250,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.frame_config.grid_columnconfigure(1, weight=1)
         
         # Platform Selection
-        self.lbl_platform = ctk.CTkLabel(self.frame_config, text="Platform:")
+        self.lbl_platform = ctk.CTkLabel(self.frame_config, text=self.t("platform"))
         self.lbl_platform.grid(row=0, column=0, padx=10, pady=10, sticky="w")
         
         self.platform_var = ctk.StringVar(value="Generic (YouTube/Bilibili etc.)")
@@ -94,7 +260,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.combo_platform.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
         
         # Quality Selection
-        self.lbl_quality = ctk.CTkLabel(self.frame_config, text="Max Quality:")
+        self.lbl_quality = ctk.CTkLabel(self.frame_config, text=self.t("quality"))
         self.lbl_quality.grid(row=0, column=2, padx=10, pady=10, sticky="w")
         
         self.quality_var = ctk.StringVar(value="best")
@@ -115,31 +281,33 @@ class VideoDownloaderApp(ctk.CTk):
         self.build_dynamic_options()
         
         # Environment (Output Dir & Cookies)
-        self.lbl_outdir = ctk.CTkLabel(self.frame_config, text="Output Dir:")
+        self.lbl_outdir = ctk.CTkLabel(self.frame_config, text=self.t("outdir"))
         self.lbl_outdir.grid(row=2, column=0, padx=10, pady=10, sticky="w")
         
         self.outdir_var = ctk.StringVar(value=str(Path("./downloads").absolute()))
         self.entry_outdir = ctk.CTkEntry(self.frame_config, textvariable=self.outdir_var)
         self.entry_outdir.grid(row=2, column=1, columnspan=2, padx=10, pady=10, sticky="ew")
+        enable_undo(self.entry_outdir, self.outdir_var)
         
-        self.btn_browse = ctk.CTkButton(self.frame_config, text="Browse...", command=self.browse_dir, width=60)
+        self.btn_browse = ctk.CTkButton(self.frame_config, text=self.t("browse"), command=self.browse_dir, width=60)
         self.btn_browse.grid(row=2, column=3, padx=10, pady=10)
         
-        self.lbl_cookie = ctk.CTkLabel(self.frame_config, text="Cookies:")
+        self.lbl_cookie = ctk.CTkLabel(self.frame_config, text=self.t("cookies"))
         self.lbl_cookie.grid(row=3, column=0, padx=10, pady=10, sticky="w")
         
         self.cookie_src_var = ctk.StringVar(value="None (No login)")
         self.combo_cookie_src = ctk.CTkComboBox(self.frame_config, variable=self.cookie_src_var,
-            values=["None (No login)", "Chrome Browser", "Edge Browser", "Firefox Browser", "Brave Browser", "Clipboard (Paste text)", "Select cookies.txt..."],
+            values=[self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')],
             command=self.on_cookie_src_change)
         self.combo_cookie_src.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
         
         self.cookie_val_var = ctk.StringVar()
         self.entry_cookie_val = ctk.CTkEntry(self.frame_config, textvariable=self.cookie_val_var, state="disabled")
         self.entry_cookie_val.grid(row=3, column=2, columnspan=2, padx=10, pady=10, sticky="ew")
+        enable_undo(self.entry_cookie_val, self.cookie_val_var)
 
         # Log Level
-        self.lbl_loglevel = ctk.CTkLabel(self.frame_config, text="Log Level:")
+        self.lbl_loglevel = ctk.CTkLabel(self.frame_config, text=self.t("loglevel"))
         self.lbl_loglevel.grid(row=4, column=0, padx=10, pady=10, sticky="w")
         
         self.loglevel_var = ctk.StringVar(value="INFO")
@@ -149,7 +317,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.combo_loglevel.grid(row=4, column=1, padx=10, pady=10, sticky="ew")
 
         # Thread count
-        self.lbl_threads = ctk.CTkLabel(self.frame_config, text="Concurrency (Threads):")
+        self.lbl_threads = ctk.CTkLabel(self.frame_config, text=self.t("threads"))
         self.lbl_threads.grid(row=4, column=2, padx=10, pady=10, sticky="w")
         
         self.threads_var = ctk.StringVar(value="1")
@@ -166,7 +334,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.textbox_log = ctk.CTkTextbox(self.frame_log, state="disabled", wrap="word", font=("Consolas", 12))
         self.textbox_log.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         
-        self.lbl_status = ctk.CTkLabel(self.frame_log, text="Waiting...", font=("", 13), text_color="gray", anchor="w")
+        self.lbl_status = ctk.CTkLabel(self.frame_log, text=self.t("waiting"), font=("", 13), text_color="gray", anchor="w")
         self.lbl_status.grid(row=1, column=0, padx=10, pady=(0, 5), sticky="ew")
         
         self.progress_var = ctk.DoubleVar(value=0)
@@ -179,13 +347,13 @@ class VideoDownloaderApp(ctk.CTk):
         self.frame_actions.grid(row=4, column=0, padx=20, pady=(0, 20), sticky="ew")
         self.frame_actions.grid_columnconfigure((0, 1, 2), weight=1)
         
-        self.btn_download = ctk.CTkButton(self.frame_actions, text="Start Download", height=45, font=("", 16, "bold"), command=self.start_download)
+        self.btn_download = ctk.CTkButton(self.frame_actions, text=self.t("start"), height=45, font=("", 16, "bold"), command=self.start_download)
         self.btn_download.grid(row=0, column=0, padx=(0, 10), sticky="ew")
         
-        self.btn_pause = ctk.CTkButton(self.frame_actions, text="⏸ Pause", height=45, font=("", 16, "bold"), command=self.toggle_pause, state="disabled")
+        self.btn_pause = ctk.CTkButton(self.frame_actions, text=self.t("pause"), height=45, font=("", 16, "bold"), command=self.toggle_pause, state="disabled")
         self.btn_pause.grid(row=0, column=1, padx=10, sticky="ew")
         
-        self.btn_stop = ctk.CTkButton(self.frame_actions, text="⏹ Stop", height=45, font=("", 16, "bold"), command=self.stop_download, state="disabled", fg_color="#C62828", hover_color="#b71c1c")
+        self.btn_stop = ctk.CTkButton(self.frame_actions, text=self.t("stop"), height=45, font=("", 16, "bold"), command=self.stop_download, state="disabled", fg_color="#C62828", hover_color="#b71c1c")
         self.btn_stop.grid(row=0, column=2, padx=(10, 0), sticky="ew")
         
         # Save default colors for resetting later
@@ -223,9 +391,51 @@ class VideoDownloaderApp(ctk.CTk):
 
         self.on_loglevel_change(self.loglevel_var.get())
         
+        self.update_ui_texts()
         self.on_platform_change(self.platform_var.get())
         
-        log.info("欢迎使用 VideoDownloader GUI 版本！由于部分环境缺少配置，在启动期间如有卡顿属于正常现象。")
+        log.info(self.t("welcome"))
+
+
+    def t(self, key):
+        if not hasattr(self, 'i18n') or not hasattr(self, 'current_lang'): return key
+        return self.i18n.get(self.current_lang, {}).get(key, key)
+
+    def toggle_language(self):
+        self.current_lang = "zh" if self.current_lang == "en" else "en"
+        self.update_ui_texts()
+        self.build_dynamic_options()
+        
+    def update_ui_texts(self):
+        self.title(self.t("title"))
+        self.lbl_url.configure(text=self.t("url"))
+        self.lbl_platform.configure(text=self.t("platform"))
+        self.lbl_quality.configure(text=self.t("quality"))
+        self.lbl_outdir.configure(text=self.t("outdir"))
+        self.btn_browse.configure(text=self.t("browse"))
+        self.lbl_cookie.configure(text=self.t("cookies"))
+        self.lbl_loglevel.configure(text=self.t("loglevel"))
+        self.lbl_threads.configure(text=self.t("threads"))
+        
+        btn_states = [self.t('start'), self.t('pause'), self.t('resume'), self.t('stop')]
+        if self.btn_download.cget("text") in ["Start Download", "开始下载"] or self.btn_download.cget("text") in btn_states:
+            self.btn_download.configure(text=self.t("start"))
+        if self.btn_pause.cget("text") in ["Pause", "暂停", "⏸ Pause"]:
+            self.btn_pause.configure(text=self.t("pause"))
+        elif self.btn_pause.cget("text") in ["Resume", "继续", "▶ Resume"]:
+            self.btn_pause.configure(text=self.t("resume"))
+        if self.btn_stop.cget("text") in ["Stop", "停止", "⏹ Stop"]:
+            self.btn_stop.configure(text=self.t("stop"))
+            
+        if hasattr(self, 'btn_lang'):
+            self.btn_lang.configure(text=self.t("lang_toggle"))
+        
+        if self.lbl_status.cget("text") in ["Waiting...", "等待下载..."]:
+            self.lbl_status.configure(text=self.t("waiting"))
+            
+        # Update combo cookie values
+        cv = [self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')]
+        self.combo_cookie_src.configure(values=cv)
 
     def build_dynamic_options(self):
         # Clear dynamic frame
@@ -238,35 +448,37 @@ class VideoDownloaderApp(ctk.CTk):
             self.lbl_quality.grid()
             self.combo_quality.grid()
             
-            lbl1 = ctk.CTkLabel(self.frame_dynamic, text="播放列表范围:")
+            lbl1 = ctk.CTkLabel(self.frame_dynamic, text=self.t("playlist_range"))
             lbl1.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-            ent1 = ctk.CTkEntry(self.frame_dynamic, textvariable=self.playlist_items_var, placeholder_text="如 1-25 或 1,3,5 (留空下载所有)")
+            ent1 = ctk.CTkEntry(self.frame_dynamic, textvariable=self.playlist_items_var, placeholder_text=self.t("playlist_ph"))
             ent1.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+            enable_undo(ent1, self.playlist_items_var)
             
-            chk1 = ctk.CTkCheckBox(self.frame_dynamic, text="下载字幕", variable=self.subtitle_var)
+            chk1 = ctk.CTkCheckBox(self.frame_dynamic, text=self.t("subtitles"), variable=self.subtitle_var)
             chk1.grid(row=0, column=2, padx=10, pady=5, sticky="w")
             
         elif platform == "Harvard (CS50)":
             self.lbl_quality.grid()
             self.combo_quality.grid()
             
-            lbl1 = ctk.CTkLabel(self.frame_dynamic, text="说明: Harvard 模式支持自动探测播放列表。将全自动提取指定页面或\n播放列表下的所有 YouTube 视频、MP4 直链、PDF 讲义与源码包素材。")
+            lbl1 = ctk.CTkLabel(self.frame_dynamic, text=self.t("harvard_info"))
             lbl1.grid(row=0, column=0, columnspan=4, padx=10, pady=5, sticky="w")
             
         elif platform == "DeepLearning.AI":
             self.lbl_quality.grid_remove() # Deeplearning ai overrides quality
             self.combo_quality.grid_remove()
             
-            lbl1 = ctk.CTkLabel(self.frame_dynamic, text="指定 Week(s):")
+            lbl1 = ctk.CTkLabel(self.frame_dynamic, text=self.t("weeks"))
             lbl1.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-            ent1 = ctk.CTkEntry(self.frame_dynamic, textvariable=self.weeks_var, placeholder_text="如: 1 2 (空格分隔, 留空下载全部)")
+            ent1 = ctk.CTkEntry(self.frame_dynamic, textvariable=self.weeks_var, placeholder_text=self.t("weeks_ph"))
             ent1.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+            enable_undo(ent1, self.weeks_var)
             
         elif platform == "Coursera":
             self.lbl_quality.grid()
             self.combo_quality.grid()
             
-            chk1 = ctk.CTkCheckBox(self.frame_dynamic, text="下载字幕", variable=self.subtitle_var)
+            chk1 = ctk.CTkCheckBox(self.frame_dynamic, text=self.t("subtitles"), variable=self.subtitle_var)
             chk1.grid(row=0, column=0, padx=10, pady=5, sticky="w")
             
         else:
@@ -290,16 +502,16 @@ class VideoDownloaderApp(ctk.CTk):
             handler.setLevel(level)
         
     def on_cookie_src_change(self, choice):
-        if choice == "Select cookies.txt...":
+        if "cookies.txt" in choice:
             file_path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")])
             if file_path:
                 self.cookie_val_var.set(file_path)
                 self.entry_cookie_val.configure(state="normal")
             else:
-                self.cookie_src_var.set("None (No login)")
+                self.cookie_src_var.set(self.t("cookie_none"))
                 self.cookie_val_var.set("")
                 self.entry_cookie_val.configure(state="disabled")
-        elif choice == "Clipboard (Paste text)":
+        elif "Clipboard" in choice or "剪贴板" in choice:
             self.cookie_val_var.set("")
             self.entry_cookie_val.configure(state="normal")
             self.entry_cookie_val.focus()
@@ -315,7 +527,7 @@ class VideoDownloaderApp(ctk.CTk):
     def toggle_pause(self):
         if self.is_paused:
             self.is_paused = False
-            self.btn_pause.configure(text="⏸ Pause")
+            self.btn_pause.configure(text=self.t("pause"))
             self.pause_event.set()
         else:
             self.is_paused = True
@@ -323,11 +535,11 @@ class VideoDownloaderApp(ctk.CTk):
             self.pause_event.clear()
 
     def stop_download(self):
-        if messagebox.askyesno("Confirmation", "Stop current download and cancel queued tasks?"):
+        if messagebox.askyesno(self.t("confirm_title"), self.t("confirm_stop")):
             self.is_stopped = True
             self.is_paused = False
             self.pause_event.set() # Unblock if paused
-            self.lbl_status.configure(text="Force stopping, please wait...")
+            self.lbl_status.configure(text=self.t("stopping"))
             self.btn_stop.configure(state="disabled")
 
     def progress_hook(self, d):
@@ -335,7 +547,7 @@ class VideoDownloaderApp(ctk.CTk):
             raise ValueError("USER_STOPPED")
             
         if self.is_paused:
-            self.after(0, lambda: self.lbl_status.configure(text=f"已暂停: {Path(d.get('filename', '')).name}"))
+            self.after(0, lambda: self.lbl_status.configure(text=f"{self.t('paused_stat')}{Path(d.get('filename', '')).name}"))
             self.pause_event.wait()
             if self.is_stopped:
                 raise ValueError("USER_STOPPED")
@@ -359,32 +571,33 @@ class VideoDownloaderApp(ctk.CTk):
                         concurrent = int(self.threads_var.get())
                         if concurrent <= 1:
                             self.progress_var.set(pct)
-                            self.lbl_status.configure(text=f"正在下载: {filename}   |   速度: {speed}")
+                            self.lbl_status.configure(text=f"{self.t('downloading')}{filename}{self.t('speed')}{speed}")
                         else:
-                            self.lbl_status.configure(text=f"Concurrent downloading... Check logs")
+                            self.lbl_status.configure(text=self.t("concurrent_dl"))
                     
                 self.after(0, update_ui)
             except Exception:
                 pass
         elif d['status'] == 'finished':
+            self.downloaded_files_count += 1
             filename = Path(d.get('filename', '')).name
             if int(self.threads_var.get()) <= 1:
-                self.after(0, lambda: self.lbl_status.configure(text=f"已下载完成: {filename}，正在合并或处理..."))
+                self.after(0, lambda: self.lbl_status.configure(text=f"{self.t('finished')}{filename}{self.t('processing')}"))
                 self.after(0, lambda: self.progress_var.set(1.0))
 
     def start_download(self):
         url = self.entry_url.get().strip()
         if not url:
-            messagebox.showwarning("Warning", "Please enter URL or Course Slug")
+            messagebox.showwarning(self.t("warning"), self.t("enter_url"))
             return
             
         self.is_stopped = False
         self.is_paused = False
         self.pause_event.set()
-        self.btn_pause.configure(state="normal", text="⏸ Pause")
-        self.btn_stop.configure(state="normal", text="⏹ Stop")
+        self.btn_pause.configure(state="normal", text=self.t("pause"))
+        self.btn_stop.configure(state="normal", text=self.t("stop"))
         self.btn_download.configure(state="disabled", text="Downloading...", fg_color=self.default_btn_color, hover_color=self.default_btn_hover)
-        self.lbl_status.configure(text="Preparing...")
+        self.lbl_status.configure(text=self.t("preparing"))
         self.progress_var.set(0)
         
         # clear generic logs for new download
@@ -396,9 +609,10 @@ class VideoDownloaderApp(ctk.CTk):
         threading.Thread(target=self._download_thread, args=(url,), daemon=True).start()
         
     def _download_thread(self, url):
+        self.downloaded_files_count = 0
         try:
             log.info("=" * 60)
-            log.info(f"🚀 开始下载任务: {url}")
+            log.info(f"{self.t('log_start')}{url}")
             log.info("=" * 60)
             
             # 1. 解析 Cookie
@@ -406,24 +620,24 @@ class VideoDownloaderApp(ctk.CTk):
             cookie_val = self.cookie_val_var.get().strip()
             
             manager_kwargs = {}
-            if cookie_src == "Select cookies.txt...":
+            if "cookies.txt" in cookie_src:
                 manager_kwargs["cookies_file"] = cookie_val
-            elif cookie_src == "Clipboard (Paste text)":
+            elif "Clipboard" in cookie_src or "剪贴板" in cookie_src:
                 manager_kwargs["cookie_str"] = cookie_val
-            elif "浏览器" in cookie_src:
+            elif "Browser" in cookie_src or "浏览器" in cookie_src:
                 browser = cookie_src.split(" ")[0].lower()
                 manager_kwargs["browser"] = browser
                 
             cookies = {}
             browser_name_for_opts = None
             if manager_kwargs:
-                log.info(f"正在尝试获取 Cookie ({cookie_src})...")
+                log.info(f"{self.t('log_cookie_try')} ({cookie_src})...")
                 manager = CookieManager(**manager_kwargs)
                 try:
                     cookies = manager.get()
-                    log.info(f"成功获取到 {len(cookies)} 条 Cookie 记录。")
+                    log.info(f"{self.t('log_cookie_succ')}{len(cookies)}{self.t('log_cookie_succ2')}")
                 except Exception as e:
-                    log.warning(f"获取 Cookie 失败: {e}")
+                    log.warning(f"{self.t('log_cookie_fail')}{e}")
                 
                 # 如果是直接从浏览器提取，记录浏览器名供 yt-dlp 兜底
                 if "browser" in manager_kwargs:
@@ -509,7 +723,7 @@ class VideoDownloaderApp(ctk.CTk):
                 t.extra_opts["quiet"] = False
                 
                 # Cookie injection for yt-dlp layer
-                if cookie_src == "Select cookies.txt...":
+                if "cookies.txt" in cookie_src:
                     t.extra_opts["cookiefile"] = cookie_val
                 elif browser_name_for_opts:
                     t.extra_opts["cookiesfrombrowser"] = (browser_name_for_opts,)
@@ -605,7 +819,8 @@ class VideoDownloaderApp(ctk.CTk):
                 log.info("=" * 60)
             else:
                 log.info("\n" + "=" * 60)
-                log.info(f"✅ 队列执行完毕！成功 {success_count}，部分/瑕疵 {partial_count}，完全失败 {len(tasks) - success_count - partial_count}。")
+                fails = len(tasks) - success_count - partial_count + partial_count
+                log.info(self.t("log_success").format(success_count, fails, self.downloaded_files_count))
                 if failed_tasks:
                     log.warning(f"⚠️ The following tasks failed to download completely:")
                     error_msg_lines = []
@@ -653,7 +868,7 @@ class VideoDownloaderApp(ctk.CTk):
                     self.btn_download.configure(state="normal", text="全军覆没 (点击重传)", fg_color="#C62828", hover_color="#b71c1c")
                     self.lbl_status.configure(text="所有下载任务均已失败。")
                 else:
-                    self.btn_download.configure(state="normal", text="Start Download", fg_color=self.default_btn_color, hover_color=self.default_btn_hover)
+                    self.btn_download.configure(state="normal", text=self.t("start"), fg_color=self.default_btn_color, hover_color=self.default_btn_hover)
                     
             self.after(0, restore_btn)
 
