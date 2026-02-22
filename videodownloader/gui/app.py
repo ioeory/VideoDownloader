@@ -137,6 +137,16 @@ class VideoDownloaderApp(ctk.CTk):
         self.entry_cookie_val = ctk.CTkEntry(self.frame_config, textvariable=self.cookie_val_var, state="disabled")
         self.entry_cookie_val.grid(row=3, column=2, columnspan=2, padx=10, pady=10, sticky="ew")
 
+        # Log Level
+        self.lbl_loglevel = ctk.CTkLabel(self.frame_config, text="日志级别:")
+        self.lbl_loglevel.grid(row=4, column=0, padx=10, pady=10, sticky="w")
+        
+        self.loglevel_var = ctk.StringVar(value="INFO")
+        self.combo_loglevel = ctk.CTkComboBox(self.frame_config, variable=self.loglevel_var,
+            values=["DEBUG", "INFO", "WARNING", "ERROR"],
+            command=self.on_loglevel_change)
+        self.combo_loglevel.grid(row=4, column=1, padx=10, pady=10, sticky="ew")
+
         # 3. 进度与日志区
         self.frame_log = ctk.CTkFrame(self)
         self.frame_log.grid(row=3, column=0, padx=20, pady=10, sticky="nsew")
@@ -182,11 +192,13 @@ class VideoDownloaderApp(ctk.CTk):
         # yt-dlp logger adapter
         class YtdlpLogger:
             def debug(self, msg):
-                pass
+                if logging.getLogger().level <= logging.DEBUG:
+                    log.debug(msg)
             def info(self, msg):
-                # ignore noise
-                if "frag" in msg.lower() or "eta" in msg.lower() or "[download]" in msg:
-                    return
+                # ignore noise unless in DEBUG mode
+                if logging.getLogger().level > logging.DEBUG:
+                    if "frag" in msg.lower() or "eta" in msg.lower() or "[download]" in msg:
+                        return
                 log.info(msg)
             def warning(self, msg):
                 log.warning(msg)
@@ -194,6 +206,8 @@ class VideoDownloaderApp(ctk.CTk):
                 log.error(msg)
         self.ytdlp_logger = YtdlpLogger()
 
+        self.on_loglevel_change(self.loglevel_var.get())
+        
         self.on_platform_change(self.platform_var.get())
         
         log.info("欢迎使用 VideoDownloader GUI 版本！由于部分环境缺少配置，在启动期间如有卡顿属于正常现象。")
@@ -246,6 +260,19 @@ class VideoDownloaderApp(ctk.CTk):
 
     def on_platform_change(self, choice):
         self.build_dynamic_options()
+        
+    def on_loglevel_change(self, choice):
+        level_map = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+        }
+        level = level_map.get(choice, logging.INFO)
+        log.setLevel(level)
+        logging.getLogger().setLevel(level)
+        for handler in logging.getLogger().handlers:
+            handler.setLevel(level)
         
     def on_cookie_src_change(self, choice):
         if choice == "选择 cookies.txt 文件...":
@@ -397,6 +424,7 @@ class VideoDownloaderApp(ctk.CTk):
                     quality=quality,
                     subtitle=self.subtitle_var.get(),
                     playlist_items=self.playlist_items_var.get() or None,
+                    stop_check=lambda: self.is_stopped
                 )
             elif platform == "Harvard (CS50)":
                 plugin = HarvardPlugin()
@@ -405,6 +433,7 @@ class VideoDownloaderApp(ctk.CTk):
                     output_dir=output_dir,
                     cookies=cookies or None,
                     quality=quality,
+                    stop_check=lambda: self.is_stopped
                 )
             elif platform == "DeepLearning.AI":
                 plugin = DeepLearningPlugin()
@@ -415,6 +444,7 @@ class VideoDownloaderApp(ctk.CTk):
                     output_dir=output_dir,
                     cookies=cookies or None, # Deeplearning needs them explicitly
                     weeks=weeks,
+                    stop_check=lambda: self.is_stopped
                 )
             elif platform == "Coursera":
                 plugin = CourseraPlugin()
@@ -424,6 +454,7 @@ class VideoDownloaderApp(ctk.CTk):
                     cookies=cookies or None,
                     quality=quality,
                     subtitle=self.subtitle_var.get(),
+                    stop_check=lambda: self.is_stopped
                 )
             elif platform == "KodeKloud":
                 plugin = KodeKloudPlugin()
@@ -432,6 +463,7 @@ class VideoDownloaderApp(ctk.CTk):
                     output_dir=output_dir,
                     cookies=cookies or None,
                     quality=quality,
+                    stop_check=lambda: self.is_stopped
                 )
             elif platform == "Skills Google":
                 plugin = SkillsGooglePlugin()
@@ -440,6 +472,7 @@ class VideoDownloaderApp(ctk.CTk):
                     output_dir=output_dir,
                     cookies=cookies or None,
                     quality=quality,
+                    stop_check=lambda: self.is_stopped
                 )
 
             # 3. 注入 GUI 需要的钩子和通用 Cookies

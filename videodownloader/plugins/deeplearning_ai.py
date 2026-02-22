@@ -233,12 +233,20 @@ class DeepLearningPlugin(BasePlugin):
         tasks: list[DownloadTask] = []
 
         for section in course["sections"]:
+            if kwargs.get("stop_check") and kwargs["stop_check"]():
+                log.warning("🚫 任务解析已中止")
+                break
+                
             week_num = section["num"]
             if weeks and week_num not in weeks:
                 continue
 
             week_dir = course_dir / f"Week_{week_num:02d}"
             for lesson_slug, lesson_name in section["lessons"]:
+                if kwargs.get("stop_check") and kwargs["stop_check"]():
+                    log.warning("🚫 任务解析已中止")
+                    return tasks
+                    
                 video_url = _fetch_lesson_video_url(session, slug, lesson_slug)
                 tasks.append(DownloadTask(
                     url=video_url or f"{BASE_URL}/courses/{slug}/lesson/quis4/{lesson_slug}",

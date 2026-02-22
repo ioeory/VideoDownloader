@@ -83,11 +83,19 @@ class KodeKloudPlugin(BasePlugin):
         course_path = output_dir / sanitize_filename(course_title)
 
         for m_idx, module in enumerate(modules, 1):
+            if kwargs.get("stop_check") and kwargs["stop_check"]():
+                log.warning("🚫 获取任务队列已中止")
+                break
+                
             module_title = module.get("title", f"Module {m_idx}")
             module_path = course_path / f"{m_idx:02d} - {sanitize_filename(module_title)}"
             
             lessons = module.get("lessons", [])
             for l_idx, lesson in enumerate(lessons, 1):
+                if kwargs.get("stop_check") and kwargs["stop_check"]():
+                    log.warning("🚫 获取任务队列已中止")
+                    return tasks
+                    
                 lesson_title = lesson.get("title", f"Lesson {l_idx}")
                 lesson_id = lesson.get("id")
                 lesson_type = lesson.get("type", "video")
