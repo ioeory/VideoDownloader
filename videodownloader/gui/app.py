@@ -6,6 +6,7 @@ import threading
 import logging
 import sys
 import os
+import re
 import json
 from pathlib import Path
 
@@ -110,6 +111,7 @@ class VideoDownloaderApp(ctk.CTk):
         # 内部批次计数器（追踪单个 yt-dlp 任务内的播放列表进度）
         self._batch_total = 0   # 当前批次的总文件数（从 n_entries 读取）
         self._batch_done = 0    # 当前批次已完成的文件数
+        self._complete_videos_count = 0  # 真实完整视频数（过滤掉分流中间文件）
         self.pause_event = threading.Event()
         self.pause_event.set() # Set initial state to not paused
         self.current_lang = "en"
@@ -167,7 +169,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_start_sub": "Starting task ",
                 "log_terminated": "Task terminated: ",
                 "log_abort": "Queue execution aborted",
-                "log_success": "✅ Queue executed! Tasks Success: {}, Failed: {}. Processed {} media files/segments.",
+                "log_success": "✅ Queue complete! Tasks ✅:{} ❌:{}. Videos downloaded: {}, Media segments processed: {}.",
                 "log_partial": "Partial: ",
                 "log_failed": "Failed: ",
                 "btn_downloading": "⏳ Downloading...",
@@ -237,7 +239,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_start_sub": "开始执行任务 ",
                 "log_terminated": "任务已终止: ",
                 "log_abort": "队列执行已中止",
-                "log_success": "✅ 队列执行完毕！成功任务 {}，失败 {}。本次共已下载或合并 {} 个媒体分段/文件。",
+                "log_success": "✅ 队列执行完毕！成功 {} 个任务，失败 {} 个。共下载视频 {} 个，处理媒体分段 {} 个。",
                 "log_partial": "瑕疵 ",
                 "log_failed": "失败 ",
                 "btn_downloading": "⏳ 下载中...",
@@ -710,6 +712,10 @@ class VideoDownloaderApp(ctk.CTk):
         elif d['status'] == 'finished':
             self.downloaded_files_count += 1
             self._batch_done += 1
+            filename = Path(d.get('filename', '')).name
+            # 只统计最终合并文件（气过滤中间分流文件，如 .f299.mp4 / .f140.m4a）
+            if not re.search(r'\.f\d+\.', filename):
+                self._complete_videos_count += 1
             info = d.get('info_dict', {})
             n_entries = info.get('n_entries') or info.get('playlist_count')
             p_idx = info.get('playlist_autonumber') or info.get('playlist_index')
@@ -758,6 +764,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.downloaded_files_count = 0
         self._batch_total = 0
         self._batch_done = 0
+        self._complete_videos_count = 0
         try:
             log.info("=" * 60)
             log.info(f"{self.t('log_start')}{url}")
@@ -982,7 +989,7 @@ class VideoDownloaderApp(ctk.CTk):
             else:
                 log.info("\n" + "=" * 60)
                 fails = len(tasks) - success_count - partial_count + partial_count
-                log.info(self.t("log_success").format(success_count, fails, self.downloaded_files_count))
+                log.info(self.t("log_success").format(success_count, fails, self._complete_videos_count, self.downloaded_files_count))
                 if failed_tasks:
                     log.warning(f"⚠️ The following tasks failed to download completely:")
                     error_msg_lines = []
