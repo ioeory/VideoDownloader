@@ -22,7 +22,7 @@ def build():
         str(app_entry),  # 目标脚本
         '--name=VideoDownloader', # 输出文件名
         '--noconsole',   # 隐藏命令行黑框 (非 Console 模式)
-        '--onedir',      # 打包成单个目录（启动快，方便提供 zip 给用户）
+        '--onefile',     # 打包成单个独立可执行文件（消除 _internal 文件夹）
         '--clean',       # 每次构建清空缓存
         '--noconfirm',   # 覆盖已有构建不确认
         '--log-level=INFO',
@@ -38,8 +38,8 @@ def build():
     try:
         PyInstaller.__main__.run(pyinstaller_args)
         print("=" * 60)
-        print("✅ 构建完成! 结果已存放在当前目录下的 `dist/VideoDownloader/`")
-        print("如果是给最终用户，您可以直接将该目录打个 zip 包分发。")
+        print("✅ 构建完成! 结果已存放在当前目录下的 `dist/` 文件夹中。")
+        print("您现在可以直接将独立的 VideoDownloader 可执行文件发给别人使用了！")
     except Exception as e:
         print(f"❌ 构建过程中发生错误: {e}")
 
