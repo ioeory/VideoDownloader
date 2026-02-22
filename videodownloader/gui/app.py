@@ -107,6 +107,9 @@ class VideoDownloaderApp(ctk.CTk):
         self.total_tasks_count = 0
         self.completed_tasks_count = 0
         self.downloaded_files_count = 0
+        # 内部批次计数器（追踪单个 yt-dlp 任务内的播放列表进度）
+        self._batch_total = 0   # 当前批次的总文件数（从 n_entries 读取）
+        self._batch_done = 0    # 当前批次已完成的文件数
         self.pause_event = threading.Event()
         self.pause_event.set() # Set initial state to not paused
         self.current_lang = "en"
@@ -166,7 +169,20 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_abort": "Queue execution aborted",
                 "log_success": "✅ Queue executed! Tasks Success: {}, Failed: {}. Processed {} media files/segments.",
                 "log_partial": "Partial: ",
-                "log_failed": "Failed: "
+                "log_failed": "Failed: ",
+                "btn_downloading": "⏳ Downloading...",
+                "btn_success": "✅ Download Complete! (Click to download more)",
+                "btn_terminated": "⛔ Terminated (Click to restart)",
+                "btn_crashed": "❌ Crashed (Click to retry)",
+                "btn_partial": "⚠️ Some failed (see logs above)",
+                "btn_all_failed": "💀 All Failed (Click to retry)",
+                "stat_terminated": "Manually stopped. Completed {}/{} tasks.",
+                "stat_crashed": "A critical error occurred. Check the logs above.",
+                "stat_success": "All tasks completed successfully!",
+                "stat_partial": "✅ {} ⚠️ {} ❌ {}.",
+                "stat_all_failed": "All download tasks failed.",
+                "preparing_task": "Preparing [{}/{}]: {}",
+                "concurrent_overall": "Concurrent downloading... (Overall: {}/{})"
             },
             "zh": {
                 "title": "VideoDownloader - 通用视频下载器",
@@ -223,7 +239,20 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_abort": "队列执行已中止",
                 "log_success": "✅ 队列执行完毕！成功任务 {}，失败 {}。本次共已下载或合并 {} 个媒体分段/文件。",
                 "log_partial": "瑕疵 ",
-                "log_failed": "失败 "
+                "log_failed": "失败 ",
+                "btn_downloading": "⏳ 下载中...",
+                "btn_success": "✅ 下载成功！(点击再次发车)",
+                "btn_terminated": "⛔ 已终止 (点击重新下载)",
+                "btn_crashed": "❌ 异常崩溃 (点击重试)",
+                "btn_partial": "⚠️ 包含失败项 (提示在上方)",
+                "btn_all_failed": "💀 全军覆没 (点击重传)",
+                "stat_terminated": "已手动打断。已完成 {}/{} 个任务。",
+                "stat_crashed": "程序抛出严重异常，请检查上方日志。",
+                "stat_success": "全部任务完美处理完毕！",
+                "stat_partial": "成 {} 瑕 {} 败 {}。",
+                "stat_all_failed": "所有下载任务均已失败。",
+                "preparing_task": "即将开始 [{}/{}]: {}",
+                "concurrent_overall": "并发下载中... (整体进度: {}/{})"
             }
         }
 
@@ -634,11 +663,23 @@ class VideoDownloaderApp(ctk.CTk):
         if d['status'] == 'downloading':
             try:
                 info = d.get('info_dict', {})
+                # 优先从 yt-dlp 的 info_dict 取播放列表信息
+                n_entries = info.get('n_entries') or info.get('playlist_count')
                 p_idx = info.get('playlist_autonumber') or info.get('playlist_index')
-                p_count = info.get('n_entries') or info.get('playlist_count')
                 
-                display_idx = p_idx if p_idx is not None else self.current_task_index
-                display_total = p_count if p_count is not None else self.total_tasks_count
+                # 缓存批次总量（第一次非 None 的值起效）
+                if n_entries and n_entries > 1:
+                    self._batch_total = n_entries
+                
+                # 计算显示用的 index / total
+                if self._batch_total > 1:
+                    # 播放列表模式：用实际的播放列表位置
+                    display_idx = (p_idx if p_idx is not None else self._batch_done + 1)
+                    display_total = self._batch_total
+                else:
+                    # 单文件或外部多任务模式
+                    display_idx = self.current_task_index
+                    display_total = self.total_tasks_count
                 
                 total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
                 downloaded = d.get('downloaded_bytes', 0)
@@ -655,27 +696,39 @@ class VideoDownloaderApp(ctk.CTk):
                 def update_ui():
                     if not self.is_paused and not self.is_stopped:
                         concurrent = int(self.threads_var.get())
+                        self.progress_var.set(pct)
                         if concurrent <= 1:
-                            self.progress_var.set(pct)
                             status_text = f"[{display_idx}/{display_total}] {self.t('downloading')}{filename}{self.t('speed')}{speed}"
-                            self.lbl_status.configure(text=status_text)
+                        else:
+                            # 多线程: 进度条显示当前活跃文件，状态栏追加整体完成数
+                            status_text = f"({self.completed_tasks_count+1}/{self.total_tasks_count}) {self.t('downloading')}{filename}{self.t('speed')}{speed}"
+                        self.lbl_status.configure(text=status_text)
                         
                 self.after(0, update_ui)
             except Exception:
                 pass
         elif d['status'] == 'finished':
             self.downloaded_files_count += 1
+            self._batch_done += 1
             info = d.get('info_dict', {})
+            n_entries = info.get('n_entries') or info.get('playlist_count')
             p_idx = info.get('playlist_autonumber') or info.get('playlist_index')
-            p_count = info.get('n_entries') or info.get('playlist_count')
             
-            display_idx = p_idx if p_idx is not None else self.current_task_index
-            display_total = p_count if p_count is not None else self.total_tasks_count
+            if n_entries and n_entries > 1:
+                self._batch_total = n_entries
+            
+            if self._batch_total > 1:
+                display_idx = (p_idx if p_idx is not None else self._batch_done)
+                display_total = self._batch_total
+            else:
+                display_idx = self.current_task_index
+                display_total = self.total_tasks_count
             
             filename = Path(d.get('filename', '')).name
-            if int(self.threads_var.get()) <= 1:
-                self.after(0, lambda: self.lbl_status.configure(text=f"[{display_idx}/{display_total}] {self.t('finished')}{filename}{self.t('processing')}"))
-                self.after(0, lambda: self.progress_var.set(1.0))
+            concurrent_val = int(self.threads_var.get())
+            if concurrent_val <= 1:
+                self.after(0, lambda fn=filename, di=display_idx, dt=display_total: self.lbl_status.configure(text=f"[{di}/{dt}] {self.t('finished')}{fn}{self.t('processing')}"))
+            self.after(0, lambda: self.progress_var.set(1.0))
 
     def start_download(self):
         url = self.entry_url.get().strip()
@@ -688,7 +741,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.pause_event.set()
         self.btn_pause.configure(state="normal", text=self.t("pause"))
         self.btn_stop.configure(state="normal", text=self.t("stop"))
-        self.btn_download.configure(state="disabled", text="Downloading...", fg_color=self.default_btn_color, hover_color=self.default_btn_hover)
+        self.btn_download.configure(state="disabled", text=self.t("btn_downloading"), fg_color=self.default_btn_color, hover_color=self.default_btn_hover)
         self.lbl_status.configure(text=self.t("preparing"))
         self.progress_var.set(0)
         
@@ -703,6 +756,8 @@ class VideoDownloaderApp(ctk.CTk):
     def _download_thread(self, url):
         self.completed_tasks_count = 0
         self.downloaded_files_count = 0
+        self._batch_total = 0
+        self._batch_done = 0
         try:
             log.info("=" * 60)
             log.info(f"{self.t('log_start')}{url}")
@@ -876,7 +931,8 @@ class VideoDownloaderApp(ctk.CTk):
             else:
                 self.after(0, lambda: self.progressbar.configure(mode="determinate"))
                 self.after(0, lambda: self.progress_var.set(0))
-                self.after(0, lambda: self.lbl_status.configure(text=f"并发下载中... (整体进度: 0/{self.total_tasks_count})"))
+                self.after(0, lambda: self.lbl_status.configure(text=self.t("concurrent_overall").format(0, self.total_tasks_count)))
+                _concurrent_lock = threading.Lock()
                 
                 with ThreadPoolExecutor(max_workers=concurrent) as executor:
                     futures = {executor.submit(task.run): (i, task) for i, task in enumerate(tasks, 1)}
@@ -887,12 +943,13 @@ class VideoDownloaderApp(ctk.CTk):
                         display_name = "Resolving actual filename..." if "%(" in task.filename else task.filename
                         try:
                             name, status = future.result()
-                            self.completed_tasks_count += 1
+                            with _concurrent_lock:
+                                self.completed_tasks_count += 1
                             
-                            def update_progress(count=self.completed_tasks_count):
-                                pct = count / self.total_tasks_count
+                            def update_progress():
+                                pct = self.completed_tasks_count / self.total_tasks_count if self.total_tasks_count else 0
                                 self.progress_var.set(pct)
-                                self.lbl_status.configure(text=f"并发下载中... (整体进度: {count}/{self.total_tasks_count})")
+                                self.lbl_status.configure(text=self.t("concurrent_overall").format(self.completed_tasks_count, self.total_tasks_count))
                             self.after(0, update_progress)
                                 
                             if status == "success":
@@ -958,20 +1015,20 @@ class VideoDownloaderApp(ctk.CTk):
                 self.btn_pause.configure(state="disabled")
                 self.btn_stop.configure(state="disabled")
                 if self.is_stopped:
-                    self.btn_download.configure(state="normal", text="Terminated (Click to restart)", fg_color="#C62828", hover_color="#b71c1c")
-                    self.lbl_status.configure(text=f"已手动打断。已完成 {success_count} 个任务。")
+                    self.btn_download.configure(state="normal", text=self.t("btn_terminated"), fg_color="#C62828", hover_color="#b71c1c")
+                    self.lbl_status.configure(text=self.t("stat_terminated").format(success_count, len(tasks)))
                 elif has_error:
-                    self.btn_download.configure(state="normal", text="Crashed (Click to retry)", fg_color="#C62828", hover_color="#b71c1c")
-                    self.lbl_status.configure(text="程序抛出严重异常，请检查上方日志。")
+                    self.btn_download.configure(state="normal", text=self.t("btn_crashed"), fg_color="#C62828", hover_color="#b71c1c")
+                    self.lbl_status.configure(text=self.t("stat_crashed"))
                 elif success_count == len(tasks) and len(tasks) > 0:
-                    self.btn_download.configure(state="normal", text="下载成功！(点击再次发车)", fg_color="#2E7D32", hover_color="#1B5E20")
-                    self.lbl_status.configure(text="全部任务完美处理完毕！")
+                    self.btn_download.configure(state="normal", text=self.t("btn_success"), fg_color="#2E7D32", hover_color="#1B5E20")
+                    self.lbl_status.configure(text=self.t("stat_success"))
                 elif partial_count > 0 or (success_count > 0 and success_count < len(tasks)):
-                    self.btn_download.configure(state="normal", text="包含失败项 (提示在上方)", fg_color="#EF6C00", hover_color="#E65100")
-                    self.lbl_status.configure(text=f"成 {success_count} 瑕 {partial_count} 败 {len(tasks) - success_count - partial_count}。")
+                    self.btn_download.configure(state="normal", text=self.t("btn_partial"), fg_color="#EF6C00", hover_color="#E65100")
+                    self.lbl_status.configure(text=self.t("stat_partial").format(success_count, partial_count, len(tasks) - success_count - partial_count))
                 elif success_count == 0 and len(tasks) > 0:
-                    self.btn_download.configure(state="normal", text="全军覆没 (点击重传)", fg_color="#C62828", hover_color="#b71c1c")
-                    self.lbl_status.configure(text="所有下载任务均已失败。")
+                    self.btn_download.configure(state="normal", text=self.t("btn_all_failed"), fg_color="#C62828", hover_color="#b71c1c")
+                    self.lbl_status.configure(text=self.t("stat_all_failed"))
                 else:
                     self.btn_download.configure(state="normal", text=self.t("start"), fg_color=self.default_btn_color, hover_color=self.default_btn_hover)
                     
