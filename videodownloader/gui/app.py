@@ -212,8 +212,13 @@ class VideoDownloaderApp(ctk.CTk):
                 log.info(msg)
             def warning(self, msg):
                 log.warning(msg)
+                # 针对 Node.js 缺失检测的强提醒
+                if "JavaScript runtime" in msg or "challenge solver" in msg:
+                    log.error("➡️ **CRITICAL TIP**: Please install Node.js (https://nodejs.org/) to solve YouTube anti-bot challenges! Without it, HD videos cannot be decrypted. Please restart this GUI after installation.")
             def error(self, msg):
                 log.error(msg)
+                if "Requested format is not available" in msg:
+                    log.error("➡️ **CRITICAL TIP**: Format unavailable is likely caused by missing Node.js! Install Node.js from https://nodejs.org/")
         self.ytdlp_logger = YtdlpLogger()
 
         self.on_loglevel_change(self.loglevel_var.get())
@@ -513,7 +518,7 @@ class VideoDownloaderApp(ctk.CTk):
                 if "extractor_args" not in t.extra_opts:
                     t.extra_opts["extractor_args"] = {}
                 if "youtube" not in t.extra_opts["extractor_args"]:
-                    t.extra_opts["extractor_args"]["youtube"] = {}
+                    t.extra_opts["extractor_args"]["youtube"] = {"player_client": ["web_creator", "tv", "ios", "web"]}
 
             # 4. 执行任务
             success_count = 0

@@ -40,6 +40,7 @@ class GenericYtdlpPlugin(BasePlugin):
         subtitle: bool = False,
         filename: str = "",
         playlist_items: Optional[str] = None,
+        **kwargs,
     ) -> list[DownloadTask]:
         """
         生成通用下载任务。
@@ -55,6 +56,13 @@ class GenericYtdlpPlugin(BasePlugin):
         """
         url = url_or_id
 
+        # 针对近期 YouTube 强网关验证：覆盖默认抽取器参数，优先使用不受高强度防机器人和 DRM 影响的 Web Creator \ TV 客户端
+        extractor_args = {
+            "youtube": {
+                "player_client": ["web_creator", "tv", "ios", "web"]
+            }
+        }
+
         # 自动生成文件名（从 URL 提取或用 yt-dlp 模板）
         if not filename:
             filename = "%(title)s"
@@ -69,8 +77,10 @@ class GenericYtdlpPlugin(BasePlugin):
             "audio": "bestaudio[ext=m4a]/bestaudio/best",
         }
         fmt = format_map.get(quality, format_map["best"])
-
-        extra_opts: dict = {"format": fmt}
+        extra_opts: dict = {
+            "format": fmt,
+            "extractor_args": extractor_args
+        }
         if subtitle:
             extra_opts.update({
                 "writesubtitles": True,

@@ -77,7 +77,7 @@ def _inject_ytdlp_cookies(tasks: list[DownloadTask], args: argparse.Namespace) -
         if "extractor_args" not in t.extra_opts:
             t.extra_opts["extractor_args"] = {}
         if "youtube" not in t.extra_opts["extractor_args"]:
-            t.extra_opts["extractor_args"]["youtube"] = {}
+            t.extra_opts["extractor_args"]["youtube"] = {"player_client": ["web_creator", "tv", "ios", "web"]}
 
 
 def run_tasks(tasks: list[DownloadTask], concurrent: int = 1, delay: float = 1.0) -> None:
