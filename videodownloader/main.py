@@ -149,7 +149,12 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true",
-        help="输出调试日志",
+        help="输出调试日志 (相当于 --log-level DEBUG)",
+    )
+    parser.add_argument(
+        "--log-level", default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="设置日志输出级别 (默认: INFO)",
     )
 
 
@@ -440,7 +445,17 @@ def main() -> None:
 
     # 日志初始化
     verbose = getattr(args, "verbose", False)
-    setup_logging(verbose=verbose)
+    log_level_str = getattr(args, "log_level", "INFO")
+    
+    level_map = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+    }
+    log_level = level_map.get(log_level_str, logging.INFO)
+    
+    setup_logging(verbose=verbose, log_level=log_level)
 
     # 依赖检查
     check_dependencies()

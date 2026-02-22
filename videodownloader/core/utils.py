@@ -11,9 +11,12 @@ from pathlib import Path
 from typing import Optional
 
 
-def setup_logging(verbose: bool = False, log_file: Optional[str] = "download.log") -> logging.Logger:
+def setup_logging(verbose: bool = False, log_file: Optional[str] = "download.log", log_level: Optional[int] = None) -> logging.Logger:
     """配置并返回根 Logger"""
-    level = logging.DEBUG if verbose else logging.INFO
+    if log_level is not None:
+        level = log_level
+    else:
+        level = logging.DEBUG if verbose else logging.INFO
     handlers = [logging.StreamHandler(sys.stdout)]
     if log_file:
         handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
