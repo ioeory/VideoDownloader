@@ -101,6 +101,9 @@ class VideoDownloaderApp(ctk.CTk):
         # State vars
         self.is_paused = False
         self.is_stopped = False
+        self.current_task_index = 0
+        self.total_tasks_count = 0
+        self.completed_tasks_count = 0
         self.pause_event = threading.Event()
         self.pause_event.set() # Set initial state to not paused
         self.current_lang = "en"
@@ -579,18 +582,16 @@ class VideoDownloaderApp(ctk.CTk):
                         concurrent = int(self.threads_var.get())
                         if concurrent <= 1:
                             self.progress_var.set(pct)
-                            self.lbl_status.configure(text=f"{self.t('downloading')}{filename}{self.t('speed')}{speed}")
-                        else:
-                            self.lbl_status.configure(text=self.t("concurrent_dl"))
-                    
+                            status_text = f"[{self.current_task_index}/{self.total_tasks_count}] {self.t('downloading')}{filename}{self.t('speed')}{speed}"
+                            self.lbl_status.configure(text=status_text)
+                        
                 self.after(0, update_ui)
             except Exception:
                 pass
         elif d['status'] == 'finished':
-            self.downloaded_files_count += 1
             filename = Path(d.get('filename', '')).name
             if int(self.threads_var.get()) <= 1:
-                self.after(0, lambda: self.lbl_status.configure(text=f"{self.t('finished')}{filename}{self.t('processing')}"))
+                self.after(0, lambda: self.lbl_status.configure(text=f"[{self.current_task_index}/{self.total_tasks_count}] {self.t('finished')}{filename}{self.t('processing')}"))
                 self.after(0, lambda: self.progress_var.set(1.0))
 
     def start_download(self):
@@ -617,7 +618,7 @@ class VideoDownloaderApp(ctk.CTk):
         threading.Thread(target=self._download_thread, args=(url,), daemon=True).start()
         
     def _download_thread(self, url):
-        self.downloaded_files_count = 0
+        self.completed_tasks_count = 0
         try:
             log.info("=" * 60)
             log.info(f"{self.t('log_start')}{url}")
@@ -750,13 +751,13 @@ class VideoDownloaderApp(ctk.CTk):
             has_error = False
             failed_tasks = []
             
-            total_tasks = len(tasks)
-            if total_tasks == 0:
+            self.total_tasks_count = len(tasks)
+            if self.total_tasks_count == 0:
                 self.after(0, lambda: self.lbl_status.configure(text="No downloadable content found"))
                 log.warning("No download tasks could be parsed.")
                 return
 
-            log.info(f"发现 {total_tasks} 个下载子任务，准备下载...")
+            log.info(f"发现 {self.total_tasks_count} 个下载子任务，准备下载...")
             
             concurrent = int(self.threads_var.get())
             if concurrent <= 1:
@@ -765,9 +766,10 @@ class VideoDownloaderApp(ctk.CTk):
                         log.warning("🚫 Queue execution aborted")
                         break
                         
+                    self.current_task_index = i + 1
                     display_name = "Resolving actual filename..." if "%(" in task.filename else task.filename
-                    log.info(f"\n---> 开始执行任务 [{i+1}/{total_tasks}]: {display_name}")
-                    self.after(0, lambda name=display_name: self.lbl_status.configure(text=f"即将开始: {name}"))
+                    log.info(f"\n---> 开始执行任务 [{self.current_task_index}/{self.total_tasks_count}]: {display_name}")
+                    self.after(0, lambda name=display_name: self.lbl_status.configure(text=f"即将开始 [{self.current_task_index}/{self.total_tasks_count}]: {name}"))
                     self.after(0, lambda: self.progress_var.set(0)) # reset progress
                     
                     try:
@@ -788,8 +790,9 @@ class VideoDownloaderApp(ctk.CTk):
                         log.exception(f"❌ 任务 {display_name} 执行期间异常: {task_err}")
                         failed_tasks.append(display_name + " (Exception)")
             else:
-                self.after(0, lambda: self.progressbar.configure(mode="indeterminate"))
-                self.after(0, lambda: self.progressbar.start())
+                self.after(0, lambda: self.progressbar.configure(mode="determinate"))
+                self.after(0, lambda: self.progress_var.set(0))
+                self.after(0, lambda: self.lbl_status.configure(text=f"并发下载中... (整体进度: 0/{self.total_tasks_count})"))
                 
                 with ThreadPoolExecutor(max_workers=concurrent) as executor:
                     futures = {executor.submit(task.run): (i, task) for i, task in enumerate(tasks, 1)}
@@ -800,13 +803,21 @@ class VideoDownloaderApp(ctk.CTk):
                         display_name = "Resolving actual filename..." if "%(" in task.filename else task.filename
                         try:
                             name, status = future.result()
+                            self.completed_tasks_count += 1
+                            
+                            def update_progress(count=self.completed_tasks_count):
+                                pct = count / self.total_tasks_count
+                                self.progress_var.set(pct)
+                                self.lbl_status.configure(text=f"并发下载中... (整体进度: {count}/{self.total_tasks_count})")
+                            self.after(0, update_progress)
+                                
                             if status == "success":
                                 success_count += 1
-                                log.info(f"[{i}/{total_tasks}] ✅ {name}")
+                                log.info(f"[{self.completed_tasks_count}/{self.total_tasks_count}] ✅ {name}")
                             elif status == "partial":
                                 partial_count += 1
                                 failed_tasks.append(display_name + " (Includes failed items)")
-                                log.info(f"[{i}/{total_tasks}] ⚠️ 部分/瑕疵: {name}")
+                                log.info(f"[{self.completed_tasks_count}/{self.total_tasks_count}] ⚠️ 部分/瑕疵: {name}")
                             else:
                                 failed_tasks.append(display_name)
                                 log.info(f"[{i}/{total_tasks}] ❌ {name}")
