@@ -82,25 +82,45 @@ def _inject_ytdlp_cookies(tasks: list[DownloadTask], args: argparse.Namespace) -
 
 def run_tasks(tasks: list[DownloadTask], concurrent: int = 1, delay: float = 1.0) -> None:
     """执行所有下载任务，输出汇总报告"""
-    results: dict[str, list] = {"success": [], "failed": []}
+    results: dict[str, list] = {"success": [], "partial": [], "failed": []}
+    total = len(tasks)
+    
+    if total == 0:
+        log.warning("没有需要下载的任务。")
+        return
+
+    log.info(f"发现 {total} 个下载子任务，准备执行...")
 
     if concurrent <= 1:
-        for task in tasks:
-            name, ok = task.run()
-            results["success" if ok else "failed"].append(name)
+        for i, task in enumerate(tasks, 1):
+            log.info(f"\n---> 开始执行任务 [{i}/{total}]: {task.filename}")
+            name, status = task.run()
+            if status == "success":
+                results["success"].append(name)
+            elif status == "partial":
+                results["partial"].append(name)
+            else:
+                results["failed"].append(name)
             time.sleep(delay)
     else:
         with ThreadPoolExecutor(max_workers=concurrent) as executor:
-            futures = {executor.submit(task.run): task for task in tasks}
+            futures = {executor.submit(task.run): (i, task) for i, task in enumerate(tasks, 1)}
             for future in as_completed(futures):
-                task = futures[future]
+                i, task = futures[future]
                 try:
-                    name, ok = future.result()
-                    results["success" if ok else "failed"].append(name)
-                    log.info(f"{'✅' if ok else '❌'} {name}")
+                    name, status = future.result()
+                    if status == "success":
+                        results["success"].append(name)
+                        log.info(f"[{i}/{total}] ✅ {name}")
+                    elif status == "partial":
+                        results["partial"].append(name)
+                        log.info(f"[{i}/{total}] ⚠️ 部分/瑕疵: {name}")
+                    else:
+                        results["failed"].append(name)
+                        log.info(f"[{i}/{total}] ❌ {name}")
                 except Exception as exc:
                     results["failed"].append(task.filename)
-                    log.error(f"❌ 异常 ({task.filename}): {exc}")
+                    log.error(f"[{i}/{total}] ❌ 异常 ({task.filename}): {exc}")
 
     # 汇总报告
     sep = "=" * 60
