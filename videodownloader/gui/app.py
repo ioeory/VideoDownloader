@@ -729,8 +729,8 @@ class VideoDownloaderApp(ctk.CTk):
                 t.extra_opts["progress_hooks"] = [self.progress_hook]
                 t.extra_opts["noprogress"] = True # let GUI handle progress bar
                 t.extra_opts["quiet"] = False
-                if logging.getLogger().level <= logging.DEBUG:
-                    t.extra_opts["verbose"] = True
+                # 始终开启 verbose，交由我们的 YtdlpLogger 在输出时根据当前的动态日志级别控制，以实现秒切日志级别生效
+                t.extra_opts["verbose"] = True
                 
                 # Cookie injection for yt-dlp layer
                 if "cookies.txt" in cookie_src:
