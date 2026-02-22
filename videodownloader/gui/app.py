@@ -1,5 +1,7 @@
+```python
 import customtkinter as ctk
 import tkinter as tk
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tkinter import filedialog, messagebox
 import threading
 import logging
@@ -146,6 +148,15 @@ class VideoDownloaderApp(ctk.CTk):
             values=["DEBUG", "INFO", "WARNING", "ERROR"],
             command=self.on_loglevel_change)
         self.combo_loglevel.grid(row=4, column=1, padx=10, pady=10, sticky="ew")
+
+        # Thread count
+        self.lbl_threads = ctk.CTkLabel(self.frame_config, text="并发线程:")
+        self.lbl_threads.grid(row=4, column=2, padx=10, pady=10, sticky="w")
+        
+        self.threads_var = ctk.StringVar(value="1")
+        self.combo_threads = ctk.CTkComboBox(self.frame_config, variable=self.threads_var,
+            values=["1", "2", "3", "4", "5"])
+        self.combo_threads.grid(row=4, column=3, padx=10, pady=10, sticky="ew")
 
         # 3. 进度与日志区
         self.frame_log = ctk.CTkFrame(self)
@@ -341,16 +352,21 @@ class VideoDownloaderApp(ctk.CTk):
                 
                 def update_ui():
                     if not self.is_paused and not self.is_stopped:
-                        self.progress_var.set(pct)
-                        self.lbl_status.configure(text=f"正在下载: {filename}   |   速度: {speed}")
+                        concurrent = int(self.threads_var.get())
+                        if concurrent <= 1:
+                            self.progress_var.set(pct)
+                            self.lbl_status.configure(text=f"正在下载: {filename}   |   速度: {speed}")
+                        else:
+                            self.lbl_status.configure(text=f"并发下载中 (多线程活动)... 请查看左侧日志")
                     
                 self.after(0, update_ui)
             except Exception:
                 pass
         elif d['status'] == 'finished':
             filename = Path(d.get('filename', '')).name
-            self.after(0, lambda: self.lbl_status.configure(text=f"已下载完成: {filename}，正在合并或处理..."))
-            self.after(0, lambda: self.progress_var.set(1.0))
+            if int(self.threads_var.get()) <= 1:
+                self.after(0, lambda: self.lbl_status.configure(text=f"已下载完成: {filename}，正在合并或处理..."))
+                self.after(0, lambda: self.progress_var.set(1.0))
 
     def start_download(self):
         url = self.entry_url.get().strip()
@@ -505,34 +521,79 @@ class VideoDownloaderApp(ctk.CTk):
             partial_count = 0
             has_error = False
             failed_tasks = []
-            log.info(f"发现 {len(tasks)} 个下载子任务，准备下载...")
-            for i, task in enumerate(tasks):
-                if self.is_stopped:
-                    log.warning("🚫 队列执行已中止")
-                    break
+            
+            total_tasks = len(tasks)
+            if total_tasks == 0:
+                self.after(0, lambda: self.lbl_status.configure(text="未找到需要下载的课时内容"))
+                log.warning("没有解析出任何下载任务。")
+                return
+
+            log.info(f"发现 {total_tasks} 个下载子任务，准备下载...")
+            
+            concurrent = int(self.threads_var.get())
+            if concurrent <= 1:
+                for i, task in enumerate(tasks):
+                    if self.is_stopped:
+                        log.warning("🚫 队列执行已中止")
+                        break
+                        
+                    display_name = "解析真实文件名中..." if "%(" in task.filename else task.filename
+                    log.info(f"\n---> 开始执行任务 [{i+1}/{total_tasks}]: {display_name}")
+                    self.after(0, lambda name=display_name: self.lbl_status.configure(text=f"即将开始: {name}"))
+                    self.after(0, lambda: self.progress_var.set(0)) # reset progress
                     
-                display_name = "解析真实文件名中..." if "%(" in task.filename else task.filename
-                log.info(f"\n---> 开始执行任务 {i+1}/{len(tasks)}: {display_name}")
-                self.after(0, lambda name=display_name: self.lbl_status.configure(text=f"即将开始: {name}"))
-                self.after(0, lambda: self.progress_var.set(0)) # reset progress
+                    try:
+                        name, status = task.run()
+                        if status == "success":
+                            success_count += 1
+                        elif status == "partial":
+                            partial_count += 1
+                            failed_tasks.append(display_name + " (包含失败项)")
+                        else:
+                            failed_tasks.append(display_name)
+                    except Exception as task_err:
+                        if "USER_STOPPED" in str(task_err) or "yt_dlp" in str(task_err):
+                            if self.is_stopped:
+                                log.warning(f"🚫 任务已终止: {display_name}")
+                                break
+                        has_error = True
+                        log.exception(f"❌ 任务 {display_name} 执行期间异常: {task_err}")
+                        failed_tasks.append(display_name + " (异常)")
+            else:
+                self.after(0, lambda: self.progressbar.configure(mode="indeterminate"))
+                self.after(0, lambda: self.progressbar.start())
                 
-                try:
-                    name, status = task.run()
-                    if status == "success":
-                        success_count += 1
-                    elif status == "partial":
-                        partial_count += 1
-                        failed_tasks.append(display_name + " (包含失败项)")
-                    else:
-                        failed_tasks.append(display_name)
-                except Exception as task_err:
-                    if str(task_err) == "USER_STOPPED" or "USER_STOPPED" in str(task_err) or "yt_dlp" in str(task_err):
-                        if self.is_stopped:
-                            log.warning(f"🚫 任务已终止: {display_name}")
-                            break
-                    has_error = True
-                    log.exception(f"❌ 任务 {display_name} 执行期间异常: {task_err}")
-                    failed_tasks.append(display_name + " (异常)")
+                with ThreadPoolExecutor(max_workers=concurrent) as executor:
+                    futures = {executor.submit(task.run): (i, task) for i, task in enumerate(tasks, 1)}
+                    for future in as_completed(futures):
+                        # 检查中断。注意，如果有任务阻塞在请求或解析处，它需要通过内部钩子自行退出。
+                        # 对于已经分配但是还没有执行的任务，我们无法完美取消，但我们可以记录。
+                        i, task = futures[future]
+                        display_name = "解析真实文件名中..." if "%(" in task.filename else task.filename
+                        try:
+                            name, status = future.result()
+                            if status == "success":
+                                success_count += 1
+                                log.info(f"[{i}/{total_tasks}] ✅ {name}")
+                            elif status == "partial":
+                                partial_count += 1
+                                failed_tasks.append(display_name + " (包含失败项)")
+                                log.info(f"[{i}/{total_tasks}] ⚠️ 部分/瑕疵: {name}")
+                            else:
+                                failed_tasks.append(display_name)
+                                log.info(f"[{i}/{total_tasks}] ❌ {name}")
+                        except Exception as task_err:
+                            if "USER_STOPPED" in str(task_err) or "yt_dlp" in str(task_err):
+                                if self.is_stopped:
+                                    log.warning(f"🚫 子任务已终止: {display_name}")
+                                    continue
+                            has_error = True
+                            log.exception(f"[{i}/{total_tasks}] ❌ 异常 ({display_name}): {task_err}")
+                            failed_tasks.append(display_name + " (异常)")
+                            
+                self.after(0, lambda: self.progressbar.stop())
+                self.after(0, lambda: self.progressbar.configure(mode="determinate"))
+                self.after(0, lambda: self.progress_var.set(1.0))
             
             if self.is_stopped:
                 log.info("\n" + "=" * 60)
