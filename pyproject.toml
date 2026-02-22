@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "videodownloader"
+version = "1.0.0"
+description = "通用视频下载器 — 支持 YouTube/Bilibili/Coursera/Harvard CS50 等"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+dependencies = [
+    "requests>=2.31.0",
+    "yt-dlp>=2024.1.0",
+    "tqdm>=4.66.0",
+    "beautifulsoup4>=4.12.0",
+    "customtkinter>=5.2.2",
+    "browser-cookie3>=0.19.1",
+]
+
+[project.optional-dependencies]
+wsl = ["pycryptodomex>=3.20.0"]
+
+[project.scripts]
+vd = "videodownloader.main:main"
+
+[project.gui-scripts]
+vd-gui = "videodownloader.gui.app:main"
+
+[tool.setuptools.packages.find]
+include = ["videodownloader*"]

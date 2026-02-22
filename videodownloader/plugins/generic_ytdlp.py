@@ -10,9 +10,9 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from core.downloader import DownloadTask
-from core.utils import sanitize_filename
-from plugins.base import BasePlugin
+from videodownloader.core.downloader import DownloadTask
+from videodownloader.core.utils import sanitize_filename
+from videodownloader.plugins.base import BasePlugin
 
 log = logging.getLogger("videodownloader")
 

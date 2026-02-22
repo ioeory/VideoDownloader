@@ -26,8 +26,26 @@ def setup_logging(verbose: bool = False, log_file: Optional[str] = "download.log
     return logging.getLogger("videodownloader")
 
 
-# 检测 ffmpeg 是否存在
-HAS_FFMPEG = shutil.which("ffmpeg") is not None
+def get_ffmpeg_path() -> Optional[str]:
+    """获取 ffmpeg 可执行文件的路径，兼容自动安装的环境"""
+    # 1. 系统 PATH 中寻找
+    p = shutil.which("ffmpeg")
+    if p:
+        return p
+    
+    # 2. 从 install.bat 自动下载的路径寻找 (Windows LocalAppData)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        base_dir = Path(local_app_data) / "VideoDownloader" / "ffmpeg"
+        if base_dir.exists():
+            for exe in base_dir.rglob("ffmpeg.exe"):
+                if "bin" in str(exe):
+                    return str(exe)
+                    
+    return None
+
+FFMPEG_PATH = get_ffmpeg_path()
+HAS_FFMPEG = FFMPEG_PATH is not None
 
 
 def is_wsl() -> bool:

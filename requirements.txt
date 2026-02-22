@@ -1,6 +1,8 @@
 requests>=2.31.0
 yt-dlp>=2024.1.0
 tqdm>=4.66.0
+beautifulsoup4>=4.12.0
+customtkinter>=5.2.2
 browser-cookie3>=0.19.1
 # 可选：WSL 模式下解密 Chrome Cookie（AES-GCM）
 # pycryptodomex>=3.20.0

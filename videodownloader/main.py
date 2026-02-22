@@ -26,15 +26,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
-from core.cookies import CookieManager
-from core.downloader import DownloadTask
-from core.utils import is_wsl, setup_logging
-from plugins.coursera import CourseraPlugin
-from plugins.deeplearning_ai import DeepLearningPlugin
-from plugins.generic_ytdlp import GenericYtdlpPlugin
-from plugins.kodekloud import KodeKloudPlugin
-from plugins.skills_google import SkillsGooglePlugin
-from plugins.harvard import HarvardPlugin
+from videodownloader.core.cookies import CookieManager
+from videodownloader.core.downloader import DownloadTask
+from videodownloader.core.utils import is_wsl, setup_logging
+from videodownloader.plugins.coursera import CourseraPlugin
+from videodownloader.plugins.deeplearning_ai import DeepLearningPlugin
+from videodownloader.plugins.generic_ytdlp import GenericYtdlpPlugin
+from videodownloader.plugins.kodekloud import KodeKloudPlugin
+from videodownloader.plugins.skills_google import SkillsGooglePlugin
+from videodownloader.plugins.harvard import HarvardPlugin
 
 log = logging.getLogger("videodownloader")
 
@@ -340,13 +340,13 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  python main.py download "https://www.youtube.com/watch?v=jNQXAC9IVRw"
-  python main.py deeplearning --course ai-for-everyone --cookies-file cookies.txt
-  python main.py deeplearning --course ai-for-everyone --weeks 1 2 -c 2
-  python main.py coursera --url "https://www.coursera.org/learn/..." --cookies-file cookies.txt
-  python main.py skillsgoogle --url "https://www.skills.google/paths/1951/..." --cookies-file cookies.txt
-  python main.py harvard --url "https://cs50.harvard.edu/python/" --quality 1080p
-  python main.py list-courses
+  vd download "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+  vd deeplearning --course ai-for-everyone --cookies-file cookies.txt
+  vd deeplearning --course ai-for-everyone --weeks 1 2 -c 2
+  vd coursera --url "https://www.coursera.org/learn/..." --cookies-file cookies.txt
+  vd skillsgoogle --url "https://www.skills.google/paths/1951/..." --cookies-file cookies.txt
+  vd harvard --url "https://cs50.harvard.edu/python/" --quality 1080p
+  vd list-courses
         """,
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
