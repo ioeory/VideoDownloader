@@ -700,15 +700,15 @@ class VideoDownloaderApp(ctk.CTk):
                         concurrent = int(self.threads_var.get())
                         self.progress_var.set(pct)
                         if concurrent <= 1:
-                            status_text = f"[{display_idx}/{display_total}] {self.t('downloading')}{filename}{self.t('speed')}{speed}"
+                            status_text = f"[{display_idx}/{display_total}] {self.t('downloading')}{filename}"
                         else:
                             # 多线程: 优先用 _batch_total 批次计数器
                             if self._batch_total > 1:
-                                status_text = f"[{display_idx}/{display_total}] {self.t('downloading')}{filename}{self.t('speed')}{speed}"
+                                status_text = f"[{display_idx}/{display_total}] {self.t('downloading')}{filename}"
                             else:
-                                status_text = f"({self.completed_tasks_count+1}/{self.total_tasks_count}) {self.t('downloading')}{filename}{self.t('speed')}{speed}"
+                                status_text = f"({self.completed_tasks_count+1}/{self.total_tasks_count}) {self.t('downloading')}{filename}"
                         self.lbl_status.configure(text=status_text)
-                        # 在按鈕上显示当前速度
+                        # 速度只显示在按钮上
                         self.btn_download.configure(text=f"{self.t('btn_downloading')} {speed}")
                         
                 self.after(0, update_ui)
