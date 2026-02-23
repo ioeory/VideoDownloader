@@ -121,24 +121,24 @@ class VideoDownloaderApp(ctk.CTk):
                 "url": "Video/Course URL:",
                 "platform": "Platform:",
                 "quality": "Max Quality:",
-                "outdir": "Output Dir:",
+                "outdir": "Output Directory:",
                 "browse": "Browse...",
-                "cookies": "Cookies:",
+                "cookies": "Cookies Source:",
                 "loglevel": "Log Level:",
-                "threads": "Concurrency (Threads):",
-                "waiting": "Waiting...",
+                "threads": "Concurrent Threads:",
+                "waiting": "Waiting for download...",
                 "start": "Start Download",
                 "pause": "Pause",
                 "resume": "Resume",
                 "stop": "Stop",
-                "playlist_range": "Playlist Items:",
-                "playlist_ph": "e.g. 1-25 or 1,3,5 (blank for all)",
+                "playlist_range": "Playlist Range:",
+                "playlist_ph": "e.g. 1-25 or 1,3,5 (Empty: All)",
                 "subtitles": "Download Subtitles",
-                "harvard_info": "Info: Harvard mode auto-detects playlists and downloads videos, PDFs, and assets.",
-                "weeks": "Specific Week(s):",
-                "weeks_ph": "e.g. 1 2 (space separated, blank for all)",
-                "welcome": "Welcome to VideoDownloader GUI! Stuttering during startup is normal.",
-                "lang_toggle": "Language: ZH",
+                "harvard_info": "Info: Harvard mode supports auto-detection. Extracts YouTube, direct links, and PDFs.",
+                "weeks": "Specify Week(s):",
+                "weeks_ph": "e.g. 1 2 (Space separated, Empty: All)",
+                "welcome": "Welcome to VideoDownloader GUI! Temporary freezes during startup are normal.",
+                "lang_toggle": "Language (ZH/EN)",
                 "cookie_none": "None (No login)",
                 "cookie_chrome": "Chrome Browser",
                 "cookie_edge": "Edge Browser",
@@ -158,6 +158,8 @@ class VideoDownloaderApp(ctk.CTk):
                 "stopping": "Force stopping, please wait...",
                 "confirm_title": "Confirmation",
                 "confirm_stop": "Stop current download and cancel queued tasks?",
+                "items": " items",
+                "preparing_batch": "📊 Batch Preparing ({} items)",
                 "log_start": "🚀 Starting download task: ",
                 "log_cookie_try": "Trying to get Cookie from ",
                 "log_cookie_succ": "Successfully extracted ",
@@ -169,7 +171,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_start_sub": "Starting task ",
                 "log_terminated": "Task terminated: ",
                 "log_abort": "Queue execution aborted",
-                "log_success": "✅ Queue complete! Tasks ✅:{} ❌:{}. Videos downloaded: {}, Media segments processed: {}.",
+                "log_success": "✅ Queue complete! Tasks ✅:{} ❌:{}. Videos: {}, Segments: {}.",
                 "log_partial": "Partial: ",
                 "log_failed": "Failed: ",
                 "btn_downloading": "⏳ Downloading...",
@@ -184,7 +186,16 @@ class VideoDownloaderApp(ctk.CTk):
                 "stat_partial": "✅ {} ⚠️ {} ❌ {}.",
                 "stat_all_failed": "All download tasks failed.",
                 "preparing_task": "Preparing [{}/{}]: {}",
-                "concurrent_overall": "Concurrent downloading... (Overall: {}/{})"
+                "concurrent_overall": "Concurrent downloading... (Overall: {}/{})",
+                "log_stopped_manual": "🛑 Download stopped manually. Completed: {} success.",
+                "log_tasks_fail_list": "⚠️ The following tasks failed to download completely:",
+                "msg_tasks_fail_title": "Some tasks failed to download",
+                "msg_tasks_fail_body": "In the queue batch just now, {} tasks failed to download completely:\n\n{}\n\nSee logs above for details.",
+                "log_found_subtasks": "Found {} sub-tasks, preparing download...",
+                "log_starting_task": "Starting task [{}/{}]: {}",
+                "stat_starting_task": "Starting [{}/{}]: {}",
+                "log_playlist_prescan": "📊 Playlist pre-scan complete, found {} entries",
+                "log_success_count": "Tasks ✅:{} ❌:{}. Videos: {}. Segments: {}."
             },
             "zh": {
                 "title": "VideoDownloader - 通用视频下载器",
@@ -208,7 +219,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "weeks": "指定 Week(s):",
                 "weeks_ph": "如 1 2 (空格分隔, 留空: 全部)",
                 "welcome": "欢迎使用 VideoDownloader GUI！启动期如果有卡顿属于正常现象。",
-                "lang_toggle": "Language: EN",
+                "lang_toggle": "切换语言 (ZH/EN)",
                 "cookie_none": "无 (免登录)",
                 "cookie_chrome": "Chrome 浏览器",
                 "cookie_edge": "Edge 浏览器",
@@ -228,6 +239,8 @@ class VideoDownloaderApp(ctk.CTk):
                 "stopping": "正在强制停止，请稍候...",
                 "confirm_title": "确认",
                 "confirm_stop": "确定要停止当前下载(会取消后续任务)吗？",
+                "items": " 个项目",
+                "preparing_batch": "📊 准备中 ({} 个项目)",
                 "log_start": "🚀 开始下载任务: ",
                 "log_cookie_try": "正在尝试获取 Cookie ",
                 "log_cookie_succ": "成功获取到 ",
@@ -239,7 +252,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_start_sub": "开始执行任务 ",
                 "log_terminated": "任务已终止: ",
                 "log_abort": "队列执行已中止",
-                "log_success": "✅ 队列执行完毕！成功 {} 个任务，失败 {} 个。共下载视频 {} 个，处理媒体分段 {} 个。",
+                "log_success": "✅ 队列执行完毕！成功 {} 个任务，失败 {} 个。视频 {} 分段 {}。",
                 "log_partial": "瑕疵 ",
                 "log_failed": "失败 ",
                 "btn_downloading": "⏳ 下载中...",
@@ -254,7 +267,16 @@ class VideoDownloaderApp(ctk.CTk):
                 "stat_partial": "成 {} 瑕 {} 败 {}。",
                 "stat_all_failed": "所有下载任务均已失败。",
                 "preparing_task": "即将开始 [{}/{}]: {}",
-                "concurrent_overall": "并发下载中... (整体进度: {}/{})"
+                "concurrent_overall": "并发下载中... (整体进度: {}/{})",
+                "log_stopped_manual": "🛑 下载已被用户提前手动停止。完成情况: {} 成功。",
+                "log_tasks_fail_list": "⚠️ 以下任务未能完整下载:",
+                "msg_tasks_fail_title": "部分任务下载失败",
+                "msg_tasks_fail_body": "在刚才的批量队列中，有 {} 个任务无法完整下载：\n\n{}\n\n详情请查看上方日志区域。",
+                "log_found_subtasks": "发现 {} 个下载子任务，准备下载...",
+                "log_starting_task": "---> 开始执行任务 [{}/{}]: {}",
+                "stat_starting_task": "即将开始 [{}/{}]: {}",
+                "log_playlist_prescan": "📊 播放列表预扫描完成，共 {} 个项目",
+                "log_success_count": "成功 {} 失败 {}。视频 {} 分段 {}。"
             }
         }
 
@@ -530,6 +552,16 @@ class VideoDownloaderApp(ctk.CTk):
         btn_states = [self.t('start'), self.t('pause'), self.t('resume'), self.t('stop')]
         if self.btn_download.cget("text") in ["Start Download", "开始下载"] or self.btn_download.cget("text") in btn_states:
             self.btn_download.configure(text=self.t("start"))
+        else:
+            # Handling other button states during language switch
+            current_btn_text = self.btn_download.cget("text")
+            # Loop through keys to find if current text matches any i18n value
+            for langcode in ["en", "zh"]:
+                for key in ["btn_success", "btn_terminated", "btn_crashed", "btn_partial", "btn_all_failed"]:
+                    if self.i18n[langcode].get(key) in current_btn_text:
+                        self.btn_download.configure(text=self.t(key))
+                        break
+
         if self.btn_pause.cget("text") in ["Pause", "暂停", "⏸ Pause"]:
             self.btn_pause.configure(text=self.t("pause"))
         elif self.btn_pause.cget("text") in ["Resume", "继续", "▶ Resume"]:
@@ -890,7 +922,7 @@ class VideoDownloaderApp(ctk.CTk):
                         self._batch_total = n
                         self._batch_done = 0
                         self.after(0, lambda count=n: self.lbl_status.configure(
-                            text=f"📊 {self.t('preparing')} ({count} 个项目)"))
+                            text=self.t('preparing_batch').format(count)))
                     return set_batch_total
                 t.playlist_count_callback = make_callback(t)
                 
@@ -918,7 +950,7 @@ class VideoDownloaderApp(ctk.CTk):
                 log.warning("No download tasks could be parsed.")
                 return
 
-            log.info(f"发现 {self.total_tasks_count} 个下载子任务，准备下载...")
+            log.info(self.t("log_found_subtasks").format(self.total_tasks_count))
             
             concurrent = int(self.threads_var.get())
             if concurrent <= 1:
@@ -931,8 +963,8 @@ class VideoDownloaderApp(ctk.CTk):
                     self._batch_total = 0  # 每个外部任务开始时重置批次计数器
                     self._batch_done = 0
                     display_name = "Resolving actual filename..." if "%(" in task.filename else task.filename
-                    log.info(f"\n---> 开始执行任务 [{self.current_task_index}/{self.total_tasks_count}]: {display_name}")
-                    self.after(0, lambda name=display_name: self.lbl_status.configure(text=f"即将开始 [{self.current_task_index}/{self.total_tasks_count}]: {name}"))
+                    log.info(self.t("log_starting_task").format(self.current_task_index, self.total_tasks_count, display_name))
+                    self.after(0, lambda name=display_name: self.lbl_status.configure(text=self.t("stat_starting_task").format(self.current_task_index, self.total_tasks_count, name)))
                     self.after(0, lambda: self.progress_var.set(0)) # reset progress
                     
                     try:
@@ -947,11 +979,10 @@ class VideoDownloaderApp(ctk.CTk):
                     except Exception as task_err:
                         if "USER_STOPPED" in str(task_err) or "yt_dlp" in str(task_err):
                             if self.is_stopped:
-                                log.warning(f"🚫 任务已终止: {display_name}")
+                                log.warning(f"🚫 Task terminated: {display_name}")
                                 break
                         has_error = True
-                        log.exception(f"❌ 任务 {display_name} 执行期间异常: {task_err}")
-                        failed_tasks.append(display_name + " (Exception)")
+                        log.exception(f"❌ Exception during task {display_name} execution: {task_err}")
             else:
                 self.after(0, lambda: self.progressbar.configure(mode="determinate"))
                 self.after(0, lambda: self.progress_var.set(0))
@@ -1001,14 +1032,14 @@ class VideoDownloaderApp(ctk.CTk):
             
             if self.is_stopped:
                 log.info("\n" + "=" * 60)
-                log.info(f"🛑 下载已被用户提前手动停止。完成情况: {success_count} 成功。")
+                log.info(self.t("log_stopped_manual").format(success_count))
                 log.info("=" * 60)
             else:
                 log.info("\n" + "=" * 60)
                 fails = len(tasks) - success_count - partial_count + partial_count
                 log.info(self.t("log_success").format(success_count, fails, self._complete_videos_count, self.downloaded_files_count))
                 if failed_tasks:
-                    log.warning(f"⚠️ The following tasks failed to download completely:")
+                    log.warning(self.t("log_tasks_fail_list"))
                     error_msg_lines = []
                     for ftask in failed_tasks:
                         log.warning(f"  - {ftask}")
@@ -1019,11 +1050,11 @@ class VideoDownloaderApp(ctk.CTk):
                     max_display = 15
                     display_text = "\n".join(error_msg_lines[:max_display])
                     if len(error_msg_lines) > max_display:
-                        display_text += f"\n...以及另外 {len(error_msg_lines) - max_display} 个任务"
+                        display_text += f"\n...and {len(error_msg_lines) - max_display} more"
                         
                     self.after(0, lambda: messagebox.showwarning(
-                        "Some tasks failed to download",
-                        f"在刚才的批量队列中，有 {len(error_msg_lines)} 个任务无法完整下载：\n\n{display_text}\n\n详情请查看上方日志区域。"
+                        self.t("msg_tasks_fail_title"),
+                        self.t("msg_tasks_fail_body").format(len(error_msg_lines), display_text)
                     ))
                 else:
                     log.info("=" * 60)
