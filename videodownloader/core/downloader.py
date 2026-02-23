@@ -64,6 +64,7 @@ def download_with_ytdlp(
     cookie_domain: str = ".example.com",
     referer: str = "",
     extra_opts: Optional[dict] = None,
+    playlist_count_callback=None,
 ) -> str:
     """
     使用 yt-dlp 下载视频（支持 m3u8/mp4/YouTube/Bilibili/Vimeo 等）
@@ -177,6 +178,18 @@ def download_with_ytdlp(
                         return "success"
             else:
                 expected_size = None # 忽略播放列表的预估大小
+                # 快速预扫描播放列表获取项目总数，通知 GUI 旴新进度条
+                try:
+                    flat_info = ydl.extract_info(url, download=False, process=False)
+                    entries = flat_info.get('entries') or []
+                    n = len(list(entries)) if hasattr(entries, '__iter__') else flat_info.get('n_entries', 0)
+                    if not n:
+                        n = flat_info.get('n_entries') or flat_info.get('playlist_count') or 0
+                    if n and n > 1 and playlist_count_callback:
+                        playlist_count_callback(int(n))
+                        log.info(f"📊 播放列表预扫描完成，共 {n} 个话题")
+                except Exception as pre_e:
+                    log.debug(f"播放列表预扫描失败 (不影响下载): {pre_e}")
                 log.info(f"📚 检测到允许播放列表，直接开始批量抓取")
 
             log.info(f"⏳ 开始执行 yt-dlp 队列 (目标: {filename})")
@@ -311,6 +324,7 @@ class DownloadTask:
         self.metadata = metadata or {}
         self.extra_opts = extra_opts
         self.ignore_global_cookies = ignore_global_cookies
+        self.playlist_count_callback = None  # 可由 GUI 设置，用于通知播放列表项目数
 
     def run(self) -> tuple[str, str]:
         """执行下载，返回 (filename, status) status: success, partial, error"""
@@ -336,6 +350,7 @@ class DownloadTask:
                 cookie_domain=self.cookie_domain,
                 referer=self.referer,
                 extra_opts=self.extra_opts,
+                playlist_count_callback=self.playlist_count_callback,
             )
         return self.filename, success
 

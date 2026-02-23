@@ -702,9 +702,14 @@ class VideoDownloaderApp(ctk.CTk):
                         if concurrent <= 1:
                             status_text = f"[{display_idx}/{display_total}] {self.t('downloading')}{filename}{self.t('speed')}{speed}"
                         else:
-                            # 多线程: 进度条显示当前活跃文件，状态栏追加整体完成数
-                            status_text = f"({self.completed_tasks_count+1}/{self.total_tasks_count}) {self.t('downloading')}{filename}{self.t('speed')}{speed}"
+                            # 多线程: 优先用 _batch_total 批次计数器
+                            if self._batch_total > 1:
+                                status_text = f"[{display_idx}/{display_total}] {self.t('downloading')}{filename}{self.t('speed')}{speed}"
+                            else:
+                                status_text = f"({self.completed_tasks_count+1}/{self.total_tasks_count}) {self.t('downloading')}{filename}{self.t('speed')}{speed}"
                         self.lbl_status.configure(text=status_text)
+                        # 在按鈕上显示当前速度
+                        self.btn_download.configure(text=f"{self.t('btn_downloading')} {speed}")
                         
                 self.after(0, update_ui)
             except Exception:
@@ -879,6 +884,16 @@ class VideoDownloaderApp(ctk.CTk):
                 # 始终开启 verbose，交由我们的 YtdlpLogger 在输出时根据当前的动态日志级别控制，以实现秒切日志级别生效
                 t.extra_opts["verbose"] = True
                 
+                # 设置播放列表项目数回调（让 downloader.py 在载入列表信息后通知 GUI ）
+                def make_callback(task_ref):
+                    def set_batch_total(n):
+                        self._batch_total = n
+                        self._batch_done = 0
+                        self.after(0, lambda count=n: self.lbl_status.configure(
+                            text=f"📊 {self.t('preparing')} ({count} 个项目)"))
+                    return set_batch_total
+                t.playlist_count_callback = make_callback(t)
+                
                 # Cookie injection for yt-dlp layer
                 if "cookies.txt" in cookie_src:
                     t.extra_opts["cookiefile"] = cookie_val
@@ -913,6 +928,8 @@ class VideoDownloaderApp(ctk.CTk):
                         break
                         
                     self.current_task_index = i + 1
+                    self._batch_total = 0  # 每个外部任务开始时重置批次计数器
+                    self._batch_done = 0
                     display_name = "Resolving actual filename..." if "%(" in task.filename else task.filename
                     log.info(f"\n---> 开始执行任务 [{self.current_task_index}/{self.total_tasks_count}]: {display_name}")
                     self.after(0, lambda name=display_name: self.lbl_status.configure(text=f"即将开始 [{self.current_task_index}/{self.total_tasks_count}]: {name}"))
