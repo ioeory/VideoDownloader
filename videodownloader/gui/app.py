@@ -704,7 +704,24 @@ class VideoDownloaderApp(ctk.CTk):
                 
                 # Update UI state for cookies
                 if "cookie_src" in config:
-                    self.on_cookie_src_change(config["cookie_src"])
+                    src = config["cookie_src"]
+                    
+                    target_key = "cookie_none"
+                    for b_key in ['cookie_none', 'cookie_chrome', 'cookie_edge', 'cookie_firefox', 'cookie_brave', 'cookie_clipboard', 'cookie_file']:
+                        en_val = self.i18n.get('en', {}).get(b_key, b_key)
+                        zh_val = self.i18n.get('zh', {}).get(b_key, b_key)
+                        if (en_val and en_val in src) or (zh_val and zh_val in src) or b_key in src:
+                            target_key = b_key
+                            break
+                            
+                    translated_src = self.t(target_key)
+                    self.cookie_src_var.set(translated_src)
+                    
+                    if target_key in ("cookie_file", "cookie_clipboard"):
+                        self.entry_cookie_val.configure(state="normal")
+                    else:
+                        self.entry_cookie_val.configure(state="disabled")
+                        
                     self.cookie_val_var.set(config.get("cookie_val", ""))
                 
                 self.on_loglevel_change(self.loglevel_var.get())
@@ -764,57 +781,6 @@ class VideoDownloaderApp(ctk.CTk):
         self.lbl_threads.configure(text=self.t("threads"))
         
         btn_states = [self.t('start'), self.t('pause'), self.t('resume'), self.t('stop')]
-        # Identify if current button text is a variant of 'Start' (across languages/icons)
-        current_dl_text = self.btn_download.cget("text")
-        is_init_state = any(kw in current_dl_text for kw in ["Start", "开始"])
-        if is_init_state or current_dl_text in btn_states:
-            self.btn_download.configure(text=self.t("start"))
-        else:
-            # Handling other button states during language switch
-            for langcode in ["en", "zh"]:
-                for key in ["btn_success", "btn_terminated", "btn_crashed", "btn_partial", "btn_all_failed"]:
-                    val = self.i18n[langcode].get(key)
-                    if val and val in current_dl_text:
-                        self.btn_download.configure(text=self.t(key))
-                        break
-
-        if any(kw in self.btn_pause.cget("text") for kw in ["Pause", "暂停"]):
-            self.btn_pause.configure(text=self.t("pause"))
-        elif any(kw in self.btn_pause.cget("text") for kw in ["Resume", "继续"]):
-            self.btn_pause.configure(text=self.t("resume"))
-            
-        if any(kw in self.btn_stop.cget("text") for kw in ["Stop", "停止"]):
-            self.btn_stop.configure(text=self.t("stop"))
-            
-        if any(kw in self.lbl_status.cget("text") for kw in ["Waiting...", "等待下载..."]):
-            self.lbl_status.configure(text=self.t("status_waiting"))
-            
-        # Update combo cookie values
-        cv = [self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')]
-        self.combo_cookie_src.configure(values=cv)
-
-
-    def t(self, key):
-        if not hasattr(self, 'i18n') or not hasattr(self, 'current_lang'): return key
-        return self.i18n.get(self.current_lang, {}).get(key, key)
-
-    def toggle_language(self):
-        self.current_lang = "zh" if self.current_lang == "en" else "en"
-        self.update_ui_texts()
-        self.build_dynamic_options()
-        
-    def update_ui_texts(self):
-        self.title(self.t("title"))
-        self.lbl_url.configure(text=self.t("url"))
-        self.lbl_platform.configure(text=self.t("platform"))
-        self.lbl_quality.configure(text=self.t("quality"))
-        self.lbl_outdir.configure(text=self.t("outdir"))
-        self.btn_browse.configure(text=self.t("browse"))
-        self.lbl_cookie.configure(text=self.t("cookies"))
-        self.lbl_loglevel.configure(text=self.t("loglevel"))
-        self.lbl_threads.configure(text=self.t("threads"))
-        
-        btn_states = [self.t('start'), self.t('pause'), self.t('resume'), self.t('stop')]
         if self.btn_download.cget("text") in ["Start Download", "开始下载"] or self.btn_download.cget("text") in btn_states:
             self.btn_download.configure(text=self.t("start"))
         if self.btn_pause.cget("text") in ["Pause", "暂停", "⏸ Pause"]:
@@ -833,6 +799,21 @@ class VideoDownloaderApp(ctk.CTk):
         # Update combo cookie values
         cv = [self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')]
         self.combo_cookie_src.configure(values=cv)
+        
+        # Translate the currently selected cookie source
+        current_cookie_src = self.cookie_src_var.get()
+        target_key = None
+        for lang_code in ['en', 'zh']:
+            if not hasattr(self, 'i18n'): break
+            lang_dict = self.i18n.get(lang_code, {})
+            for key in ['cookie_none', 'cookie_chrome', 'cookie_edge', 'cookie_firefox', 'cookie_brave', 'cookie_clipboard', 'cookie_file']:
+                if lang_dict.get(key) == current_cookie_src:
+                    target_key = key
+                    break
+            if target_key: break
+            
+        if target_key:
+            self.cookie_src_var.set(self.t(target_key))
 
     def build_dynamic_options(self):
         # Clear dynamic frame
