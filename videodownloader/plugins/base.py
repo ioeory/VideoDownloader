@@ -55,5 +55,11 @@ class BasePlugin(ABC):
         """判断本插件是否能处理该 URL"""
         return any(domain in url for domain in self.domains)
 
+    def _t(self, key: str, default: str, *args, **kwargs) -> str:
+        """翻译助手"""
+        t = kwargs.get("translator")
+        if t: return t(key).format(*args)
+        return default.format(*args)
+
     def __repr__(self) -> str:
         return f"<Plugin: {self.name}>"

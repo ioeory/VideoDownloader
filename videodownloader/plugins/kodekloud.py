@@ -45,18 +45,18 @@ class KodeKloudPlugin(BasePlugin):
         **kwargs
     ) -> List[DownloadTask]:
         if not cookies:
-            log.error("KodeKloud 下载需要有效的 Cookie")
+            log.error(self._t("log_cookie_required", "🚫 Cookie required for this platform.", **kwargs))
             return []
 
         token = self._get_token(cookies)
         if not token:
-            log.error("在 Cookie 中找不到 'session-cookie' (JWT)。请确保使用了正确的 KodeKloud Cookie。")
+            log.error(self._t("log_session_cookie_missing", "🚫 Missing 'session-cookie' in your cookies. Make sure you are logged in.", **kwargs))
             return []
 
         # 提取 course slug
         # 支持: https://learn.kodekloud.com/user/courses/ai-assisted-ansible
         course_slug = url_or_id.strip("/").split("/")[-1]
-        log.info(f"正在获取课程信息: {course_slug}")
+        log.info(self._t("log_fetching_course_info", "⏳ Fetching course info: {}", course_slug, **kwargs))
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -72,19 +72,19 @@ class KodeKloudPlugin(BasePlugin):
             r.raise_for_status()
             course_data = r.json()
         except Exception as e:
-            log.error(f"无法获取课程结构: {e}")
+            log.error(self._t("log_course_structure_error", "❌ Failed to fetch course structure: {}", e, **kwargs))
             return []
 
         course_title = course_data.get("title", course_slug)
         modules = course_data.get("modules", [])
-        log.info(f"找到模块数: {len(modules)}")
+        log.info(self._t("log_modules_found", "Found {} modules", len(modules), **kwargs))
 
         tasks = []
         course_path = output_dir / sanitize_filename(course_title)
 
         for m_idx, module in enumerate(modules, 1):
             if kwargs.get("stop_check") and kwargs["stop_check"]():
-                log.warning("🚫 获取任务队列已中止")
+                log.warning(self._t("log_parsing_aborted", "🚫 Task parsing aborted", **kwargs))
                 break
                 
             module_title = module.get("title", f"Module {m_idx}")
@@ -93,7 +93,7 @@ class KodeKloudPlugin(BasePlugin):
             lessons = module.get("lessons", [])
             for l_idx, lesson in enumerate(lessons, 1):
                 if kwargs.get("stop_check") and kwargs["stop_check"]():
-                    log.warning("🚫 获取任务队列已中止")
+                    log.warning(self._t("log_parsing_aborted", "🚫 Task parsing aborted", **kwargs))
                     return tasks
                     
                 lesson_title = lesson.get("title", f"Lesson {l_idx}")
@@ -101,10 +101,10 @@ class KodeKloudPlugin(BasePlugin):
                 lesson_type = lesson.get("type", "video")
 
                 if lesson_type != "video":
-                    log.debug(f"跳过非视频内容: {lesson_title}")
+                    log.debug(self._t("log_skipping_non_video", "⏭ Skipping non-video content: {}", lesson_title, **kwargs))
                     continue
 
-                log.info(f"正在获取课时视频 ID: {lesson_title}")
+                log.info(self._t("log_getting_lesson_video", "⏳ Getting video ID for lesson: {}", lesson_title, **kwargs))
                 lesson_api = f"https://learn-api.kodekloud.com/api/lessons/{lesson_id}"
                 try:
                     # 使用与获取课程相同的 headers (含 JWT)
@@ -115,7 +115,7 @@ class KodeKloudPlugin(BasePlugin):
                     # 获取 video_url，通常类似 "https://vimeo.com/123456789"
                     video_url_raw = lesson_data.get("video_url")
                     if not video_url_raw:
-                        log.warning(f"课时 {lesson_title} 没有找到视频 URL")
+                        log.warning(self._t("log_video_url_not_found", "⚠️ No video URL found for lesson: {}", lesson_title, **kwargs))
                         continue
 
                     # 转换为 Vimeo 播放器地址或保持原样
@@ -147,6 +147,6 @@ class KodeKloudPlugin(BasePlugin):
                         }
                     ))
                 except Exception as e:
-                    log.error(f"获取课时 {lesson_title} 失败: {e}")
+                    log.error(self._t("log_lesson_failed", "❌ Failed for lesson {}: {}", lesson_title, e, **kwargs))
 
         return tasks

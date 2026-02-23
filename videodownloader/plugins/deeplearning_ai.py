@@ -152,7 +152,11 @@ def _fetch_lesson_video_url(
                     ["videoUrl", "video_url", "url", "src", "streamUrl"],
                 )
                 if url:
-                    log.info(f"API 获取视频 URL: {url[:60]}...")
+                    t = kwargs.get("translator")
+                    def get_t(k, d, *a):
+                        if t: return t(k).format(*a)
+                        return d.format(*a)
+                    log.info(get_t("log_api_url", "API got video URL: {}...", url[:60]))
                     return url
         except Exception:
             pass
@@ -166,7 +170,11 @@ def _fetch_lesson_video_url(
         if url:
             return url
     except Exception as e:
-        log.warning(f"HTML 页面解析失败 ({lesson_slug}): {e}")
+        t = kwargs.get("translator")
+        def get_t(k, d, *a):
+            if t: return t(k).format(*a)
+            return d.format(*a)
+        log.warning(get_t("log_html_failed", "HTML parsing failed ({}): {}", lesson_slug, e))
 
     # 3. 兜底：把课程页面 URL 直接交给 yt-dlp
     return lesson_url
@@ -210,14 +218,14 @@ class DeepLearningPlugin(BasePlugin):
         if not slug:
             raise ValueError(f"无法从输入解析课程 slug: {url_or_id}")
 
-        log.info(f"准备下载课程: {slug}")
-
+        log.info(self._t("log_fetching_course", "Preparing to download course: {}", slug, **kwargs))
+ 
         # 获取课程结构
         course = BUILTIN_COURSES.get(slug)
         if not course:
             log.warning(
-                f"课程 '{slug}' 无内置结构，将尝试直接下载主页面（功能受限）。\n"
-                f"如需完整支持，请向 VideoDownloader 提交课程结构 PR。"
+                self._t("log_builtin_missing", "Course '{}' has no built-in structure. Attempting direct page download (limited functionality).", slug, **kwargs) + "\n" +
+                self._t("log_builtin_tip", "For full support, please submit a Course structure PR.", **kwargs)
             )
             return [DownloadTask(
                 url=f"{BASE_URL}/courses/{slug}",
@@ -234,7 +242,7 @@ class DeepLearningPlugin(BasePlugin):
 
         for section in course["sections"]:
             if kwargs.get("stop_check") and kwargs["stop_check"]():
-                log.warning("🚫 任务解析已中止")
+                log.warning(self._t("log_parsing_aborted", "🚫 Task parsing aborted", **kwargs))
                 break
                 
             week_num = section["num"]
@@ -244,10 +252,10 @@ class DeepLearningPlugin(BasePlugin):
             week_dir = course_dir / f"Week_{week_num:02d}"
             for lesson_slug, lesson_name in section["lessons"]:
                 if kwargs.get("stop_check") and kwargs["stop_check"]():
-                    log.warning("🚫 任务解析已中止")
+                    log.warning(self._t("log_parsing_aborted", "🚫 Task parsing aborted", **kwargs))
                     return tasks
                     
-                video_url = _fetch_lesson_video_url(session, slug, lesson_slug)
+                video_url = _fetch_lesson_video_url(session, slug, lesson_slug, **kwargs)
                 tasks.append(DownloadTask(
                     url=video_url or f"{BASE_URL}/courses/{slug}/lesson/quis4/{lesson_slug}",
                     output_dir=week_dir,
@@ -258,7 +266,7 @@ class DeepLearningPlugin(BasePlugin):
                     metadata={"course": slug, "week": week_num, "lesson": lesson_slug},
                 ))
 
-        log.info(f"共生成 {len(tasks)} 个下载任务")
+        log.info(self._t("log_generated_tasks", "Generated {} download tasks count", len(tasks), **kwargs))
         return tasks
 
     @staticmethod

@@ -163,7 +163,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_start": "🚀 Starting download task: ",
                 "log_cookie_try": "Trying to get Cookie from ",
                 "log_cookie_succ": "Successfully extracted ",
-                "log_cookie_succ2": " Cookie items.",
+                "log_cookie_succ2": " {} Cookie items.",
                 "log_cookie_fail": "Failed to get Cookie: ",
                 "log_no_task": "No download tasks could be parsed.",
                 "log_found_tasks": "Found ",
@@ -195,7 +195,50 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_starting_task": "Starting task [{}/{}]: {}",
                 "stat_starting_task": "Starting [{}/{}]: {}",
                 "log_playlist_prescan": "📊 Playlist pre-scan complete, found {} entries",
-                "log_success_count": "Tasks ✅:{} ❌:{}. Videos: {}. Segments: {}."
+                "log_success_count": "Tasks ✅:{} ❌:{}. Videos: {}. Segments: {}.",
+                "tip_node_warning": "➡️ **CRITICAL TIP**: Please install Node.js (https://nodejs.org/) to solve YouTube anti-bot challenges! Without it, HD videos cannot be decrypted. Please restart this GUI after installation.",
+                "tip_node_error": "➡️ **CRITICAL TIP**: Format unavailable is likely caused by missing Node.js! Install Node.js from https://nodejs.org/",
+                "file_type_txt": "Text Files",
+                "file_type_all": "All Files",
+                "log_extracting_info": "⏳ Extracting video info: {}",
+                "log_extract_failed": "❌ Failed to extract info for {} (empty result)",
+                "log_file_incomplete": "⚠️ File incomplete: Actual {} < Expected {} (90%). Resuming download for: {}",
+                "log_file_too_small": "⚠️ File too small (<1KB), deleting and redownloading: {}",
+                "log_skip_complete": "Skip already downloaded: {}",
+                "log_playlist_detected": "📚 Playlist detected, starting batch extraction...",
+                "log_starting_ytdlp": "⏳ Starting yt-dlp queue for {}",
+                "log_download_complete": "✅ Download complete: {}",
+                "log_size_mismatch": "⚠️ Downloaded file ({} bytes) is much smaller than expected ({} bytes), please check {}",
+                "log_partial_failed": "⚠️ Some tasks or items in the playlist failed to download.",
+                "log_ytdlp_failed": "❌ yt-dlp download failed ({}): {}",
+                "log_resume_requests": "Resuming from {} bytes: {}",
+                "log_start_requests": "⏳ Starting download: {}",
+                "log_user_stopped_dl": "🚫 User stopped download: {}",
+                "log_requests_failed": "❌ requests download failed ({}): {}",
+                "log_fetching_course": "Preparing to download course: {}",
+                "log_builtin_missing": "Course '{}' has no built-in structure. Attempting direct page download (limited functionality).",
+                "log_builtin_tip": "For full support, please submit a Course structure PR.",
+                "log_parsing_aborted": "🚫 Task parsing aborted",
+                "log_generated_tasks": "Generated {} download tasks count",
+                "log_no_ffmpeg": "ffmpeg not found. Priority will be single file with audio (quality might be limited).",
+                "log_api_url": "API got video URL: {}...",
+                "log_html_failed": "HTML parsing failed ({}): {}",
+                "log_cookie_required": "🚫 Cookie required for this platform.",
+                "log_session_cookie_missing": "🚫 Missing 'session-cookie' in your cookies. Make sure you are logged in.",
+                "log_fetching_course_info": "⏳ Fetching course info: {}",
+                "log_course_structure_error": "❌ Failed to fetch course structure: {}",
+                "log_modules_found": "Found {} modules",
+                "log_skipping_non_video": "⏭ Skipping non-video content: {}",
+                "log_getting_lesson_video": "⏳ Getting video ID for lesson: {}",
+                "log_video_url_not_found": "⚠️ No video URL found for lesson: {}",
+                "log_lesson_failed": "❌ Failed for lesson {}: {}",
+                "log_google_skills_no_cookie": "⚠️ No cookies provided. Might redirect to login and fail.",
+                "log_parsing_subpage": "⏳ Parsing sub-page: {} ({})",
+                "log_no_embed_found": "⚠️ No embed video found in {}",
+                "log_cards_found": "📚 Found course template, detected {} video cards",
+                "log_no_pycryptodomex": "🚫 pycryptodomex not installed, cannot decrypt cookies. Run: pip install pycryptodomex",
+                "log_no_tasks_parsed": "No download tasks could be parsed.",
+                "log_no_tasks_to_download": "No tasks to download."
             },
             "zh": {
                 "title": "VideoDownloader - 通用视频下载器",
@@ -244,7 +287,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_start": "🚀 开始下载任务: ",
                 "log_cookie_try": "正在尝试获取 Cookie ",
                 "log_cookie_succ": "成功获取到 ",
-                "log_cookie_succ2": " 条记录。",
+                "log_cookie_succ2": " {} 条记录。",
                 "log_cookie_fail": "获取 Cookie 失败: ",
                 "log_no_task": "没有解析出任何下载任务。",
                 "log_found_tasks": "发现 ",
@@ -252,7 +295,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_start_sub": "开始执行任务 ",
                 "log_terminated": "任务已终止: ",
                 "log_abort": "队列执行已中止",
-                "log_success": "✅ 队列执行完毕！成功 {} 个任务，失败 {} 个。视频 {} 分段 {}。",
+                "log_success": "✅ 队列执行完毕！成功 {} 个任务，失败 {} 个。共下载视频 {} 个，处理媒体分段 {} 个。",
                 "log_partial": "瑕疵 ",
                 "log_failed": "失败 ",
                 "btn_downloading": "⏳ 下载中...",
@@ -276,7 +319,50 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_starting_task": "---> 开始执行任务 [{}/{}]: {}",
                 "stat_starting_task": "即将开始 [{}/{}]: {}",
                 "log_playlist_prescan": "📊 播放列表预扫描完成，共 {} 个项目",
-                "log_success_count": "成功 {} 失败 {}。视频 {} 分段 {}。"
+                "log_success_count": "成功 {} 失败 {}。视频 {} 分段 {}。",
+                "tip_node_warning": "➡️ **重要提示**: 请安装 Node.js (https://nodejs.org/) 以解决 YouTube 机器人验证！否则 HD 视频可能无法解密。安装后请重启下载器。",
+                "tip_node_error": "➡️ **重要提示**: 格式不可用通常是由缺少 Node.js 引起的！请从 https://nodejs.org/ 安装。",
+                "file_type_txt": "文本文件",
+                "file_type_all": "所有文件",
+                "log_extracting_info": "⏳ 正在提取视频信息: {}",
+                "log_extract_failed": "❌ 提取 {} 信息失败 (返回为空)",
+                "log_file_incomplete": "⚠️ 文件不完整: 实际 {} < 预期 {} (90%)。准备恢复下载: {}",
+                "log_file_too_small": "⚠️ 文件过小 (<1KB)，删除重新下载: {}",
+                "log_skip_complete": "⏭ 已完整下载 (大小满足预期)，跳过: {}",
+                "log_playlist_detected": "📚 检测到允许播放列表，直接开始批量抓取",
+                "log_starting_ytdlp": "⏳ 开始执行 yt-dlp 队列 (目标: {})",
+                "log_download_complete": "✅ 下载完成: {}",
+                "log_size_mismatch": "⚠️ 下载文件 ({} 字节) 远小于预期 ({} 字节)，请留意 {}",
+                "log_partial_failed": "⚠️ 此任务或播放列表中包含部分下载失败的项目/视频。",
+                "log_ytdlp_failed": "❌ yt-dlp 下载失败 ({}): {}",
+                "log_resume_requests": "断点续传，从 {} 字节继续: {}",
+                "log_start_requests": "⏳ 开始下载: {}",
+                "log_user_stopped_dl": "🚫 用户停止了下载: {}",
+                "log_requests_failed": "❌ requests 下载失败 ({}): {}",
+                "log_fetching_course": "准备下载课程: {}",
+                "log_builtin_missing": "课程 '{}' 无内置结构，将尝试直接下载主页面 (功能受限)。",
+                "log_builtin_tip": "如需完整支持，请向 VideoDownloader 提交课程结构 PR。",
+                "log_parsing_aborted": "🚫 任务解析已中止",
+                "log_generated_tasks": "共生成 {} 个下载任务",
+                "log_no_ffmpeg": "未检测到 ffmpeg，将优先下载包含音轨的单文件 (可能画质受限)。",
+                "log_api_url": "API 获取视频 URL: {}...",
+                "log_html_failed": "HTML 页面解析失败 ({}): {}",
+                "log_cookie_required": "🚫 此平台下载需要有效的 Cookie。",
+                "log_session_cookie_missing": "🚫 在 Cookie 中找不到 'session-cookie' (JWT)。请确保使用了正确的登录信息。",
+                "log_fetching_course_info": "⏳ 正在获取课程信息: {}",
+                "log_course_structure_error": "❌ 无法获取课程结构: {}",
+                "log_modules_found": "找到模块数: {}",
+                "log_skipping_non_video": "⏭ 跳过非视频内容: {}",
+                "log_getting_lesson_video": "⏳ 正在获取课时视频 ID: {}",
+                "log_video_url_not_found": "⚠️ 课时 {} 没有找到视频 URL",
+                "log_lesson_failed": "❌ 获取课时 {} 失败: {}",
+                "log_google_skills_no_cookie": "⚠️ 未提供 Cookie，可能会重定向到登录页无法解析。",
+                "log_parsing_subpage": "⏳ 正在解析子视频页: {} ({})",
+                "log_no_embed_found": "⚠️ 在 {} 未找到支持下载的视频嵌入链接 (iframe src 等)",
+                "log_cards_found": "📚 检测到课程模板页，找到 {} 个视频卡片",
+                "log_no_pycryptodomex": "🚫 pycryptodomex 未安装，无法解密 Cookie。运行: pip install pycryptodomex",
+                "log_no_tasks_parsed": "无法解析任何下载任务。",
+                "log_no_tasks_to_download": "没有需要下载的任务。"
             }
         }
 
@@ -354,7 +440,7 @@ class VideoDownloaderApp(ctk.CTk):
         self.lbl_cookie = ctk.CTkLabel(self.frame_config, text=self.t("cookies"))
         self.lbl_cookie.grid(row=3, column=0, padx=10, pady=10, sticky="w")
         
-        self.cookie_src_var = ctk.StringVar(value="None (No login)")
+        self.cookie_src_var = ctk.StringVar(value=self.t("cookie_none"))
         self.combo_cookie_src = ctk.CTkComboBox(self.frame_config, variable=self.cookie_src_var, state="readonly",
             values=[self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')],
             command=self.on_cookie_src_change)
@@ -449,11 +535,11 @@ class VideoDownloaderApp(ctk.CTk):
                 log.warning(msg)
                 # 针对 Node.js 缺失检测的强提醒
                 if "JavaScript runtime" in msg or "challenge solver" in msg:
-                    log.error("➡️ **CRITICAL TIP**: Please install Node.js (https://nodejs.org/) to solve YouTube anti-bot challenges! Without it, HD videos cannot be decrypted. Please restart this GUI after installation.")
+                    log.error(t("tip_node_warning"))
             def error(self, msg):
                 log.error(msg)
                 if "Requested format is not available" in msg:
-                    log.error("➡️ **CRITICAL TIP**: Format unavailable is likely caused by missing Node.js! Install Node.js from https://nodejs.org/")
+                    log.error(t("tip_node_error"))
         self.ytdlp_logger = YtdlpLogger()
 
         self.on_loglevel_change(self.loglevel_var.get())
@@ -550,30 +636,30 @@ class VideoDownloaderApp(ctk.CTk):
         self.lbl_threads.configure(text=self.t("threads"))
         
         btn_states = [self.t('start'), self.t('pause'), self.t('resume'), self.t('stop')]
-        if self.btn_download.cget("text") in ["Start Download", "开始下载"] or self.btn_download.cget("text") in btn_states:
+        # Identify if current button text is a variant of 'Start' (across languages/icons)
+        current_dl_text = self.btn_download.cget("text")
+        is_init_state = any(kw in current_dl_text for kw in ["Start", "开始"])
+        if is_init_state or current_dl_text in btn_states:
             self.btn_download.configure(text=self.t("start"))
         else:
             # Handling other button states during language switch
-            current_btn_text = self.btn_download.cget("text")
-            # Loop through keys to find if current text matches any i18n value
             for langcode in ["en", "zh"]:
                 for key in ["btn_success", "btn_terminated", "btn_crashed", "btn_partial", "btn_all_failed"]:
-                    if self.i18n[langcode].get(key) in current_btn_text:
+                    val = self.i18n[langcode].get(key)
+                    if val and val in current_dl_text:
                         self.btn_download.configure(text=self.t(key))
                         break
 
-        if self.btn_pause.cget("text") in ["Pause", "暂停", "⏸ Pause"]:
+        if any(kw in self.btn_pause.cget("text") for kw in ["Pause", "暂停"]):
             self.btn_pause.configure(text=self.t("pause"))
-        elif self.btn_pause.cget("text") in ["Resume", "继续", "▶ Resume"]:
+        elif any(kw in self.btn_pause.cget("text") for kw in ["Resume", "继续"]):
             self.btn_pause.configure(text=self.t("resume"))
-        if self.btn_stop.cget("text") in ["Stop", "停止", "⏹ Stop"]:
+            
+        if any(kw in self.btn_stop.cget("text") for kw in ["Stop", "停止"]):
             self.btn_stop.configure(text=self.t("stop"))
             
-        if hasattr(self, 'btn_lang'):
-            self.btn_lang.configure(text=self.t("lang_toggle"))
-        
-        if self.lbl_status.cget("text") in ["Waiting...", "等待下载..."]:
-            self.lbl_status.configure(text=self.t("waiting"))
+        if any(kw in self.lbl_status.cget("text") for kw in ["Waiting...", "等待下载..."]):
+            self.lbl_status.configure(text=self.t("status_waiting"))
             
         # Update combo cookie values
         cv = [self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')]
@@ -644,8 +730,8 @@ class VideoDownloaderApp(ctk.CTk):
             handler.setLevel(level)
         
     def on_cookie_src_change(self, choice):
-        if "cookies.txt" in choice:
-            file_path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")])
+        if choice == self.t("cookie_file"):
+            file_path = filedialog.askopenfilename(filetypes=[(self.t("file_type_txt"), "*.txt"), (self.t("file_type_all"), "*.*")])
             if file_path:
                 self.cookie_val_var.set(file_path)
                 self.entry_cookie_val.configure(state="normal")
@@ -653,7 +739,7 @@ class VideoDownloaderApp(ctk.CTk):
                 self.cookie_src_var.set(self.t("cookie_none"))
                 self.cookie_val_var.set("")
                 self.entry_cookie_val.configure(state="disabled")
-        elif "Clipboard" in choice or "剪贴板" in choice:
+        elif choice == self.t("cookie_clipboard"):
             self.cookie_val_var.set("")
             self.entry_cookie_val.configure(state="normal")
             self.entry_cookie_val.focus()
@@ -673,7 +759,7 @@ class VideoDownloaderApp(ctk.CTk):
             self.pause_event.set()
         else:
             self.is_paused = True
-            self.btn_pause.configure(text="▶ Resume")
+            self.btn_pause.configure(text=self.t("resume"))
             self.pause_event.clear()
 
     def stop_download(self):
@@ -802,6 +888,8 @@ class VideoDownloaderApp(ctk.CTk):
         self._batch_total = 0
         self._batch_done = 0
         self._complete_videos_count = 0
+        self.partial_tasks_count = 0 # New counter for partially successful tasks
+        self.failed_tasks_count = 0 # New counter for failed tasks
         try:
             log.info("=" * 60)
             log.info(f"{self.t('log_start')}{url}")
@@ -812,11 +900,11 @@ class VideoDownloaderApp(ctk.CTk):
             cookie_val = self.cookie_val_var.get().strip()
             
             manager_kwargs = {}
-            if "cookies.txt" in cookie_src:
+            if self.t("cookie_file") in cookie_src:
                 manager_kwargs["cookies_file"] = cookie_val
-            elif "Clipboard" in cookie_src or "剪贴板" in cookie_src:
+            elif self.t("cookie_clipboard") in cookie_src:
                 manager_kwargs["cookie_str"] = cookie_val
-            elif "Browser" in cookie_src or "浏览器" in cookie_src:
+            elif any(kw in cookie_src for kw in [self.t("cookie_chrome"), self.t("cookie_edge"), self.t("cookie_firefox"), self.t("cookie_brave")]):
                 browser = cookie_src.split(" ")[0].lower()
                 manager_kwargs["browser"] = browser
                 
@@ -916,6 +1004,9 @@ class VideoDownloaderApp(ctk.CTk):
                 # 始终开启 verbose，交由我们的 YtdlpLogger 在输出时根据当前的动态日志级别控制，以实现秒切日志级别生效
                 t.extra_opts["verbose"] = True
                 
+                # 设置翻译函数
+                t.translator = self.t
+                
                 # 设置播放列表项目数回调（让 downloader.py 在载入列表信息后通知 GUI ）
                 def make_callback(task_ref):
                     def set_batch_total(n):
@@ -927,7 +1018,7 @@ class VideoDownloaderApp(ctk.CTk):
                 t.playlist_count_callback = make_callback(t)
                 
                 # Cookie injection for yt-dlp layer
-                if "cookies.txt" in cookie_src:
+                if self.t("cookie_file") in cookie_src:
                     t.extra_opts["cookiefile"] = cookie_val
                 elif browser_name_for_opts:
                     t.extra_opts["cookiesfrombrowser"] = (browser_name_for_opts,)
@@ -946,8 +1037,8 @@ class VideoDownloaderApp(ctk.CTk):
             
             self.total_tasks_count = len(tasks)
             if self.total_tasks_count == 0:
-                self.after(0, lambda: self.lbl_status.configure(text="No downloadable content found"))
-                log.warning("No download tasks could be parsed.")
+                self.after(0, lambda: self.lbl_status.configure(text=self.t("no_content_found")))
+                log.warning(self.t("log_no_tasks"))
                 return
 
             log.info(self.t("log_found_subtasks").format(self.total_tasks_count))
@@ -956,7 +1047,7 @@ class VideoDownloaderApp(ctk.CTk):
             if concurrent <= 1:
                 for i, task in enumerate(tasks):
                     if self.is_stopped:
-                        log.warning("🚫 Queue execution aborted")
+                        log.warning(self.t("log_abort"))
                         break
                         
                     self.current_task_index = i + 1
@@ -979,10 +1070,10 @@ class VideoDownloaderApp(ctk.CTk):
                     except Exception as task_err:
                         if "USER_STOPPED" in str(task_err) or "yt_dlp" in str(task_err):
                             if self.is_stopped:
-                                log.warning(f"🚫 Task terminated: {display_name}")
+                                log.warning(f"🚫 {self.t('log_task_terminated')}: {display_name}")
                                 break
                         has_error = True
-                        log.exception(f"❌ Exception during task {display_name} execution: {task_err}")
+                        log.exception(f"❌ {self.t('log_task_exception').format(display_name, task_err)}")
             else:
                 self.after(0, lambda: self.progressbar.configure(mode="determinate"))
                 self.after(0, lambda: self.progress_var.set(0))
@@ -1012,18 +1103,18 @@ class VideoDownloaderApp(ctk.CTk):
                                 log.info(f"[{self.completed_tasks_count}/{self.total_tasks_count}] ✅ {name}")
                             elif status == "partial":
                                 partial_count += 1
+                                log.info(f"[{self.completed_tasks_count}/{self.total_tasks_count}] ⚠️ {self.t('log_partial')}: {name}")
                                 failed_tasks.append(display_name + " (Includes failed items)")
-                                log.info(f"[{self.completed_tasks_count}/{self.total_tasks_count}] ⚠️ 部分/瑕疵: {name}")
                             else:
                                 failed_tasks.append(display_name)
-                                log.info(f"[{i}/{total_tasks}] ❌ {name}")
+                                log.info(f"[{self.completed_tasks_count}/{self.total_tasks_count}] ❌ {name}")
                         except Exception as task_err:
                             if "USER_STOPPED" in str(task_err) or "yt_dlp" in str(task_err):
                                 if self.is_stopped:
-                                    log.warning(f"🚫 子任务已终止: {display_name}")
+                                    log.warning(f"🚫 {self.t('log_task_terminated')}: {display_name}")
                                     continue
                             has_error = True
-                            log.exception(f"[{i}/{total_tasks}] ❌ 异常 ({display_name}): {task_err}")
+                            log.exception(f"[{self.completed_tasks_count}/{self.total_tasks_count}] ❌ {self.t('log_task_exception').format(display_name, task_err)}")
                             failed_tasks.append(display_name + " (Exception)")
                             
                 self.after(0, lambda: self.progressbar.stop())

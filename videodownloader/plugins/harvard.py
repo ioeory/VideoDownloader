@@ -44,13 +44,13 @@ class HarvardPlugin(BasePlugin):
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         })
 
-        log.info(f"正在获取 Harvard 页面内容: {url}")
+        log.info(self._t("log_extracting_info", "⏳ Extracting video info: {}", url, **kwargs))
         try:
             r = session.get(url, timeout=15)
             r.raise_for_status()
             html = r.text
         except Exception as e:
-            log.error(f"无法获取页面 {url}: {e}")
+            log.error(self._t("log_html_failed", "HTML parsing failed ({}): {}", url, e, **kwargs))
             return []
 
         soup = BeautifulSoup(html, "html.parser")
@@ -71,25 +71,25 @@ class HarvardPlugin(BasePlugin):
         is_week_page = bool(re.search(r'weeks/\d+/?$', url.split('#')[0]))
         
         if not is_week_page and week_links:
-            log.info(f"检测到课程主页，找到 {len(week_links)} 个子课程链接，准备批量抓取...")
+            log.info(self._t("log_playlist_detected", "📚 Playlist detected, starting batch extraction...", **kwargs))
             for idx, (w_url, w_text) in enumerate(week_links, start=0):
                 # 自动为每一个子章节补充数字序号前缀，确保可以稳固按序排序，避免同名或缺失 Week 标识
                 safe_text = sanitize_filename(w_text) if w_text else "Chapter"
                 prefix = f"{idx:02d} - {safe_text}"
                 
-                log.info(f"正在解析: {prefix} ({w_url})")
+                log.info(self._t("log_starting_task", "Starting task [{}/{}]: {}", idx+1, len(week_links), prefix, **kwargs))
                 try:
                     wr = session.get(w_url, timeout=15)
                     wr.raise_for_status()
                     week_dir = course_dir / prefix
-                    sub_tasks = self._parse_page_content(wr.text, w_url, week_dir, cookies, quality)
+                    sub_tasks = self._parse_page_content(wr.text, w_url, week_dir, cookies, quality, **kwargs)
                     tasks.extend(sub_tasks)
                 except Exception as e:
-                    log.error(f"获取子页面 {w_url} 失败: {e}")
+                    log.error(self._t("log_html_failed", "HTML parsing failed ({}): {}", w_url, e, **kwargs))
             return tasks
         else:
-            log.info("未检测到多重课程链接，作为单一页面解析")
-            return self._parse_page_content(html, url, course_dir, cookies, quality)
+            log.info(self._t("log_starting_ytdlp", "⏳ Starting yt-dlp queue for {}", course_title, **kwargs))
+            return self._parse_page_content(html, url, course_dir, cookies, quality, **kwargs)
 
     def _parse_page_content(self, html: str, url: str, course_dir: Path, cookies: Optional[dict], quality: str) -> List[DownloadTask]:
         soup = BeautifulSoup(html, "html.parser")
@@ -111,7 +111,7 @@ class HarvardPlugin(BasePlugin):
 
         video_links = []
         if mp4_groups:
-            log.info(f"在页面检测到 {len(mp4_groups)} 组 MP4 直接下载链接，优先使用...")
+            log.info(self._t("log_api_url", "API got video URL: {}...", f"MP4 Batch ({len(mp4_groups)})", **kwargs))
             for base, links in mp4_groups.items():
                 sdr_links = [link for link in links if "hdr" not in link[0].lower()]
                 pool = sdr_links if sdr_links else links
@@ -136,7 +136,7 @@ class HarvardPlugin(BasePlugin):
                 video_links.append((preferred_mp4, "Video"))
         else:
             # 2. 如果没有 MP4 链接，回退到查找 YouTube / Vimeo 链接
-            log.info("未发现直接的 MP4 下载选项，尝试搜寻 YouTube/Vimeo... 链接")
+            log.info(self._t("log_playlist_detected", "📚 Playlist detected, starting batch extraction...", **kwargs))
             for a in soup.find_all("a", href=True):
                 href = a['href']
                 if "youtube.com" in href or "youtu.be" in href or "vimeo.com" in href:
@@ -175,7 +175,7 @@ class HarvardPlugin(BasePlugin):
                     base_filename = raw_filename.rsplit('.', 1)[0] if '.' in raw_filename else sanitize_filename(a.text.strip() or f"file_{len(seen_urls)}")
                     filename_with_prefix = f"Resource - {sanitize_filename(base_filename)}"
                     
-                    log.info(f"发现资料文件: {full_url}")
+                    log.info(self._t("log_start_requests", "⏳ Starting download: {}", full_url, **kwargs))
                     tasks.append(DownloadTask(
                         url=full_url,
                         output_dir=course_dir,

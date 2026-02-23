@@ -55,10 +55,7 @@ class CourseraPlugin(BasePlugin):
             subtitle:  是否下载字幕
         """
         if not cookies:
-            log.warning(
-                "⚠️  Coursera 下载需要登录 Cookie！\n"
-                "  请使用 --cookies-file 参数提供 cookies.txt 文件。"
-            )
+            log.warning(self._t("log_cookie_required", "🚫 Cookie required for this platform.", **kwargs))
 
         url = url_or_id
         if not url.startswith("http"):
@@ -82,7 +79,7 @@ class CourseraPlugin(BasePlugin):
                 "subtitleslangs": ["zh-Hans", "en"],
             })
 
-        log.info(f"Coursera 任务: {url}")
+        log.info(self._t("log_starting_ytdlp", "⏳ Starting yt-dlp queue for {}", url, **kwargs))
         return [DownloadTask(
             url=url,
             output_dir=output_dir,

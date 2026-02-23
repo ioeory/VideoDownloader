@@ -128,6 +128,12 @@ def download_with_ytdlp(
         ydl_opts["js_runtimes"] = {"node": {}}
         ydl_opts["remote_components"] = ["ejs:github"]
 
+    # 获取翻译器（如果由 GUI 注入）
+    t = extra_opts.get("translator") if extra_opts else None
+    def _t(key, default, *args):
+        if t: return t(key).format(*args)
+        return default.format(*args)
+
     # 根据环境变量或检测结果决定格式（无 ffmpeg 则禁用合并）
     if HAS_FFMPEG:
         ydl_opts["format"] = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best"
@@ -135,7 +141,7 @@ def download_with_ytdlp(
             ydl_opts["ffmpeg_location"] = FFMPEG_PATH
     else:
         ydl_opts["format"] = "best[ext=mp4]/best"
-        log.warning("未检测到 ffmpeg，将优先下载包含音轨的单文件（可能画质受限）")
+        log.warning(_t("log_no_ffmpeg", "ffmpeg not found. Priority will be single file with audio (quality might be limited)."))
     if cookie_file:
         ydl_opts["cookiefile"] = str(cookie_file)
     if referer:
@@ -146,13 +152,13 @@ def download_with_ytdlp(
     # GUI 模式下大段的 JSON 配置会刷屏，由于已稳定运行，移除此条 Debug 日志让视觉更清晰
     
     try:
-        log.info(f"⏳ 正在提取视频信息: {url}")
+        log.info(_t("log_extracting_info", "⏳ Extracting video info: {}", url))
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             if "noplaylist" not in ydl_opts or ydl_opts["noplaylist"]:
                 # 只有单文件时提取信息以校验大小
                 info_dict = ydl.extract_info(url, download=False)
                 if not info_dict:
-                    log.error(f"❌ 提取 {filename} 信息失败 (返回为空)")
+                    log.error(_t("log_extract_failed", "❌ Failed to extract info for {} (empty result)", filename))
                     return "error"
 
                 entries = info_dict.get('entries')
@@ -167,14 +173,14 @@ def download_with_ytdlp(
                 if output_file.exists():
                     actual_size = output_file.stat().st_size
                     if expected_size and actual_size < expected_size * 0.90:
-                        log.warning(f"⚠️ 文件不完整: 实际 {actual_size} < 预期 {expected_size*0.9}({expected_size}的90%)。准备恢复下载: {output_file.name}")
+                        log.warning(_t("log_file_incomplete", "⚠️ File incomplete: Actual {} < Expected {} (90%). Resuming download for: {}", actual_size, expected_size, output_file.name))
                         part_file = output_file.with_suffix(output_file.suffix + ".part")
                         output_file.rename(part_file)
                     elif expected_size is None and actual_size <= 1024:
-                        log.warning(f"⚠️ 文件过小 (<1KB)，删除重新下载: {output_file.name}")
+                        log.warning(_t("log_file_too_small", "⚠️ File too small (<1KB), deleting and redownloading: {}", output_file.name))
                         output_file.unlink()
                     else:
-                        log.info(f"⏭ 已完整下载 (大小满足预期)，跳过: {output_file.name}")
+                        log.info(_t("log_skip_complete", "⏭ Skip already downloaded: {}", output_file.name))
                         return "success"
             else:
                 expected_size = None # 忽略播放列表的预估大小
@@ -187,12 +193,12 @@ def download_with_ytdlp(
                         n = flat_info.get('n_entries') or flat_info.get('playlist_count') or 0
                     if n and n > 1 and playlist_count_callback:
                         playlist_count_callback(int(n))
-                        log.info(f"📊 播放列表预扫描完成，共 {n} 个话题")
+                        log.info(_t("log_playlist_prescan", "📊 Playlist pre-scan complete, found {} entries", n))
                 except Exception as pre_e:
                     log.debug(f"播放列表预扫描失败 (不影响下载): {pre_e}")
-                log.info(f"📚 检测到允许播放列表，直接开始批量抓取")
+                log.info(_t("log_playlist_detected", "📚 Playlist detected, starting batch extraction..."))
 
-            log.info(f"⏳ 开始执行 yt-dlp 队列 (目标: {filename})")
+            log.info(_t("log_starting_ytdlp", "⏳ Starting yt-dlp queue for {}", filename))
             # 现在正式执行下载
             retcode = ydl.download([url])
 
@@ -200,16 +206,16 @@ def download_with_ytdlp(
         if expected_size and output_file.exists():
              actual_size = output_file.stat().st_size
              if actual_size < expected_size * 0.90: # 简单容差
-                 log.warning(f"⚠️ 下载文件 ({actual_size} 字节) 远小于预期 ({expected_size} 字节)，请留意 {output_file.name}")
+                 log.warning(_t("log_size_mismatch", "⚠️ Downloaded file ({} bytes) is much smaller than expected ({} bytes), please check {}", actual_size, expected_size, output_file.name))
         
         if retcode != 0:
-            log.warning(f"⚠️ 此任务或播放列表中包含部分下载失败的项目/视频。")
+            log.warning(_t("log_partial_failed", "⚠️ Some tasks or items in the playlist failed to download."))
             return "partial"
             
-        log.info(f"✅ 下载完成: {output_file.name}")
+        log.info(_t("log_download_complete", "✅ Download complete: {}", output_file.name))
         return "success"
     except yt_dlp.utils.DownloadError as e:
-        log.error(f"❌ yt-dlp 下载失败 ({filename}): {e}")
+        log.error(_t("log_ytdlp_failed", "❌ yt-dlp download failed ({}): {}", filename, e))
         return "error"
     finally:
         if cookie_file and cookie_file.exists():
@@ -227,11 +233,17 @@ def download_with_requests(
     ext: str = "mp4",
     session: Optional[requests.Session] = None,
     progress_hooks: Optional[list] = None,
+    extra_opts: Optional[dict] = None,
 ) -> str:
     """
     使用 requests 直接下载（备用方案）
     支持断点续传（Range 请求）及进度钩子（用于暂定/停止）
     """
+    t = extra_opts.get("translator") if extra_opts else None
+    def _t(key, default, *args):
+        if t: return t(key).format(*args)
+        return default.format(*args)
+
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"{filename}.{ext}"
     resume_pos = output_file.stat().st_size if output_file.exists() else 0
@@ -240,17 +252,17 @@ def download_with_requests(
     headers: dict = {}
     if resume_pos > 0:
         headers["Range"] = f"bytes={resume_pos}-"
-        log.info(f"断点续传，从 {resume_pos} 字节继续: {filename}")
+        log.info(_t("log_resume_requests", "Resuming from {} bytes: {}", resume_pos, filename))
 
     try:
         with sess.get(url, headers=headers, stream=True, timeout=60) as resp:
             if resp.status_code == 416:
-                log.info(f"⏭ 已完整下载 (416 Range Not Satisfiable)，跳过: {filename}")
+                log.info(_t("log_skip_complete", "⏭ Skip already downloaded: {}", filename))
                 return "success"
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0)) + resume_pos
             mode = "ab" if resume_pos > 0 else "wb"
-            log.info(f"⏳ 开始下载: {output_file.name}")
+            log.info(_t("log_start_requests", "⏳ Starting download: {}", output_file.name))
             desc_name = (output_file.name[:25] + "..." + output_file.name[-10:]) if len(output_file.name) > 40 else output_file.name
             with open(output_file, mode) as f, tqdm(
                 total=total,
@@ -275,7 +287,7 @@ def download_with_requests(
                                 hook(mock_d)
                             except Exception as hook_err:
                                 if str(hook_err) == "USER_STOPPED":
-                                    log.info(f"🚫 用户停止了下载: {filename}")
+                                    log.info(_t("log_user_stopped_dl", "🚫 User stopped download: {}", filename))
                                     return "error"
                                 raise hook_err
                                 
@@ -289,10 +301,10 @@ def download_with_requests(
                 try: hook(mock_d)
                 except: pass
                 
-        log.info(f"✅ 下载完成: {output_file.name}")
+        log.info(_t("log_download_complete", "✅ Download complete: {}", output_file.name))
         return "success"
     except requests.RequestException as e:
-        log.error(f"❌ requests 下载失败 ({filename}): {e}")
+        log.error(_t("log_requests_failed", "❌ requests download failed ({}): {}", filename, e))
         return "error"
 
 
@@ -325,9 +337,20 @@ class DownloadTask:
         self.extra_opts = extra_opts
         self.ignore_global_cookies = ignore_global_cookies
         self.playlist_count_callback = None  # 可由 GUI 设置，用于通知播放列表项目数
+        self.translator = None # 可由 GUI 设置
+    
+    def _t(self, key, default, *args):
+        if self.translator: return self.translator(key).format(*args)
+        return default.format(*args)
 
     def run(self) -> tuple[str, str]:
         """执行下载，返回 (filename, status) status: success, partial, error"""
+        # 确保 translator 进入 extra_opts 以供 standalone 函数使用
+        if self.extra_opts is None:
+            self.extra_opts = {}
+        if self.translator and "translator" not in self.extra_opts:
+            self.extra_opts["translator"] = self.translator
+
         # 判断如果是普通静态文件，则走 requests 直接下载
         ext = self.url.split('?')[0].split('.')[-1].lower()
         if ext in ['pdf', 'txt', 'zip', 'csv', 'json']:
@@ -340,6 +363,7 @@ class DownloadTask:
                 ext=ext,
                 session=sess,
                 progress_hooks=hooks,
+                extra_opts=self.extra_opts,
             )
         else:
             success = download_with_ytdlp(

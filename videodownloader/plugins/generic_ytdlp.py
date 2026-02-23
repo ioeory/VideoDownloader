@@ -91,7 +91,7 @@ class GenericYtdlpPlugin(BasePlugin):
         # 检测是否是播放列表
         is_playlist = any(kw in url for kw in ["list=", "playlist", "/playlist/"])
         if is_playlist:
-            log.info(f"检测到播放列表，将批量下载: {url}")
+            log.info(self._t("log_playlist_detected", "📚 Playlist detected, starting batch extraction...", **kwargs))
             # 存放在以播放列表名称为名字的独立文件夹中
             extra_opts["outtmpl"] = str(output_dir / "%(playlist_title)s" / "%(playlist_index)03d - %(title)s.%(ext)s")
             extra_opts["noplaylist"] = False

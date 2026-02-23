@@ -32,7 +32,7 @@ class SkillsGooglePlugin(BasePlugin):
         **kwargs
     ) -> List[DownloadTask]:
         if not cookies:
-            log.warning("未提供 Cookie，可能会重定向到登录页无法解析。")
+            log.warning(self._t("log_google_skills_no_cookie", "⚠️ No cookies provided. Might redirect to login and fail.", **kwargs))
 
         url = url_or_id
         session = requests.Session()
@@ -48,13 +48,13 @@ class SkillsGooglePlugin(BasePlugin):
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         })
 
-        log.info(f"正在获取页面内容: {url}")
+        log.info(self._t("log_extracting_info", "⏳ Extracting video info: {}", url, **kwargs))
         try:
             r = session.get(url, timeout=15)
             r.raise_for_status()
             html = r.text
         except Exception as e:
-            log.error(f"无法获取页面 {url}: {e}")
+            log.error(self._t("log_html_failed", "HTML parsing failed ({}): {}", url, e, **kwargs))
             return []
 
         # 尝试提取页面标题名作为课程名
@@ -69,7 +69,7 @@ class SkillsGooglePlugin(BasePlugin):
         cards = re.findall(r'<ql-activity-card[^>]*type=[\'"]video[\'"][^>]*>', html, re.IGNORECASE)
         
         if cards:
-            log.info(f"检测到课程模板页，找到 {len(cards)} 个视频卡片")
+            log.info(self._t("log_cards_found", "📚 Found course template, detected {} video cards", len(cards), **kwargs))
             for idx, card in enumerate(cards, start=1):
                 path_m = re.search(r'path=[\'"]([^\'"]+)[\'"]', card)
                 name_m = re.search(r'name=[\'"]([^\'"]+)[\'"]', card)
@@ -79,7 +79,7 @@ class SkillsGooglePlugin(BasePlugin):
                     video_page_url = urljoin(url, video_page_path)
                     video_name = name_m.group(1) if name_m else f"Video_{idx}"
                     
-                    log.info(f"正在解析子视频页: {video_name} ({video_page_url})")
+                    log.info(self._t("log_parsing_subpage", "⏳ Parsing sub-page: {} ({})", video_name, video_page_url, **kwargs))
                     try:
                         vr = session.get(video_page_url, timeout=10)
                         vr.raise_for_status()
@@ -91,17 +91,17 @@ class SkillsGooglePlugin(BasePlugin):
                             filename = f"{idx:02d} - {sanitize_filename(video_name)}"
                             tasks.append(self._create_task(actual_video_url, course_dir, filename, cookies, quality))
                         else:
-                            log.warning(f"在 {video_page_url} 未找到嵌入式视频 URL (iframe src 等)")
+                            log.warning(self._t("log_no_embed_found", "⚠️ No embed video found in {}", video_page_url, **kwargs))
                     except Exception as e:
-                        log.error(f"获取视频页面 {video_page_url} 失败: {e}")
+                        log.error(self._t("log_html_failed", "HTML parsing failed ({}): {}", video_page_url, e, **kwargs))
         else:
             # 可能当前页面就是一个单一视频页
-            log.info("未检测到多视频卡片，尝试作为单一视频页面解析")
+            log.info(self._t("log_starting_ytdlp", "⏳ Starting yt-dlp queue for {}", course_title, **kwargs))
             actual_video_url = self._extract_video_embed(html)
             if actual_video_url:
                 tasks.append(self._create_task(actual_video_url, course_dir, course_title, cookies, quality))
             else:
-                log.warning(f"页面 {url} 未找到支持下载的视频嵌入链接 (iframe src 等)")
+                log.warning(self._t("log_no_embed_found", "⚠️ No embed video found in {}", url, **kwargs))
 
         return tasks
 
