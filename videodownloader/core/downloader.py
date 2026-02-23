@@ -198,7 +198,7 @@ def download_with_ytdlp(
                     log.debug(f"播放列表预扫描失败 (不影响下载): {pre_e}")
                 log.info(_t("log_playlist_detected", "📚 Playlist detected, starting batch extraction..."))
 
-            log.info(_t("log_starting_ytdlp", "⏳ Starting yt-dlp queue for {}", filename))
+            log.info(_t("log_starting_ytdlp", "⏳ Starting yt-dlp queue for {} (URL: {})", filename, url))
             # 现在正式执行下载
             retcode = ydl.download([url])
 
@@ -212,7 +212,7 @@ def download_with_ytdlp(
             log.warning(_t("log_partial_failed", "⚠️ Some tasks or items in the playlist failed to download."))
             return "partial"
             
-        log.info(_t("log_download_complete", "✅ Download complete: {}", output_file.name))
+        log.info(_t("log_download_complete", "✅ Download complete: {} (URL: {})", output_file.name, url))
         return "success"
     except yt_dlp.utils.DownloadError as e:
         log.error(_t("log_ytdlp_failed", "❌ yt-dlp download failed ({}): {}", filename, e))
@@ -262,7 +262,7 @@ def download_with_requests(
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0)) + resume_pos
             mode = "ab" if resume_pos > 0 else "wb"
-            log.info(_t("log_start_requests", "⏳ Starting download: {}", output_file.name))
+            log.info(_t("log_start_requests", "⏳ Starting download: {} (URL: {})", output_file.name, url))
             desc_name = (output_file.name[:25] + "..." + output_file.name[-10:]) if len(output_file.name) > 40 else output_file.name
             with open(output_file, mode) as f, tqdm(
                 total=total,
@@ -301,7 +301,7 @@ def download_with_requests(
                 try: hook(mock_d)
                 except: pass
                 
-        log.info(_t("log_download_complete", "✅ Download complete: {}", output_file.name))
+        log.info(_t("log_download_complete", "✅ Download complete: {} (URL: {})", output_file.name, url))
         return "success"
     except requests.RequestException as e:
         log.error(_t("log_requests_failed", "❌ requests download failed ({}): {}", filename, e))

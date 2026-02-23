@@ -93,14 +93,14 @@ def run_tasks(tasks: list[DownloadTask], concurrent: int = 1, delay: float = 1.0
 
     if concurrent <= 1:
         for i, task in enumerate(tasks, 1):
-            log.info(f"\n---> 开始执行任务 [{i}/{total}]: {task.filename}")
+            log.info(f"\n---> 开始执行任务 [{i}/{total}]: {task.filename} (URL: {task.url})")
             name, status = task.run()
             if status == "success":
-                results["success"].append(name)
+                results["success"].append((name, task.url))
             elif status == "partial":
-                results["partial"].append(name)
+                results["partial"].append((name, task.url))
             else:
-                results["failed"].append(name)
+                results["failed"].append((name, task.url))
             time.sleep(delay)
     else:
         with ThreadPoolExecutor(max_workers=concurrent) as executor:
@@ -110,17 +110,17 @@ def run_tasks(tasks: list[DownloadTask], concurrent: int = 1, delay: float = 1.0
                 try:
                     name, status = future.result()
                     if status == "success":
-                        results["success"].append(name)
-                        log.info(f"[{i}/{total}] ✅ {name}")
+                        results["success"].append((name, task.url))
+                        log.info(f"[{i}/{total}] ✅ {name} (URL: {task.url})")
                     elif status == "partial":
-                        results["partial"].append(name)
-                        log.info(f"[{i}/{total}] ⚠️ 部分/瑕疵: {name}")
+                        results["partial"].append((name, task.url))
+                        log.info(f"[{i}/{total}] ⚠️ 部分/瑕疵: {name} (URL: {task.url})")
                     else:
-                        results["failed"].append(name)
-                        log.info(f"[{i}/{total}] ❌ {name}")
+                        results["failed"].append((name, task.url))
+                        log.info(f"[{i}/{total}] ❌ {name} (URL: {task.url})")
                 except Exception as exc:
-                    results["failed"].append(task.filename)
-                    log.error(f"[{i}/{total}] ❌ 异常 ({task.filename}): {exc}")
+                    results["failed"].append((task.filename, task.url))
+                    log.error(f"[{i}/{total}] ❌ 异常 ({task.filename}): {exc}\n   URL: {task.url}")
 
     # 汇总报告
     sep = "=" * 60
@@ -130,8 +130,8 @@ def run_tasks(tasks: list[DownloadTask], concurrent: int = 1, delay: float = 1.0
     print(f"   ❌ 失败: {len(results['failed'])} 个")
     if results["failed"]:
         print("\n失败列表:")
-        for name in results["failed"]:
-            print(f"   - {name}")
+        for name, url in results["failed"]:
+            print(f"   - {name} (URL: {url})")
     print(sep)
 
 

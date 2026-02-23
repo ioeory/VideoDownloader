@@ -238,6 +238,17 @@ cd VideoDownloader && pip install -e .
 
 ---
 
+## 📖 技术文档 (Wiki)
+
+查看深度技术文档以了解项目内部机制：
+- [🏗️ 系统架构](docs/architecture.md) — 模块化设计与数据流。
+- [🔌 插件开发](docs/plugins.md) — 如何支持一个新网站。
+- [🌐 国际化流程](docs/i18n.md) — 了解 patch-based 翻译机制。
+- [⚙️ 配置手册](docs/config.md) — `config.yaml` 高级参数说明。
+- [🛠️ 开发与构建](docs/development.md) — 测试、编译与发布指南。
+
+---
+
 ## ⚠️ 注意事项
 
 - 本工具仅供**个人学习**使用，请遵守各平台服务条款

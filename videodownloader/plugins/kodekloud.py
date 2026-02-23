@@ -53,9 +53,25 @@ class KodeKloudPlugin(BasePlugin):
             log.error(self._t("log_session_cookie_missing", "🚫 Missing 'session-cookie' in your cookies. Make sure you are logged in.", **kwargs))
             return []
 
-        # 提取 course slug
-        # 支持: https://learn.kodekloud.com/user/courses/ai-assisted-ansible
-        course_slug = url_or_id.strip("/").split("/")[-1]
+        # 提取 course slug 和 lesson_id (可选)
+        # 支持: 
+        #   - 课程页: https://learn.kodekloud.com/user/courses/ai-assisted-ansible
+        #   - 课时页: https://learn.kodekloud.com/user/courses/ai-assisted-ansible/module/.../lesson/UUID
+        course_slug = url_or_id
+        lesson_id_filter = None
+        
+        if "kodekloud.com" in url_or_id:
+            match = re.search(r'/user/courses/([^/]+)', url_or_id)
+            if match:
+                course_slug = match.group(1)
+            
+            # 尝试捕获特定课时 ID
+            lesson_match = re.search(r'/lesson/([^/?#]+)', url_or_id)
+            if lesson_match:
+                lesson_id_filter = lesson_match.group(1)
+        else:
+            # 兼容直接输入 slug 的情况
+            course_slug = url_or_id.strip("/").split("/")[-1]
         log.info(self._t("log_fetching_course_info", "⏳ Fetching course info: {}", course_slug, **kwargs))
 
         headers = {
@@ -99,6 +115,9 @@ class KodeKloudPlugin(BasePlugin):
                 lesson_title = lesson.get("title", f"Lesson {l_idx}")
                 lesson_id = lesson.get("id")
                 lesson_type = lesson.get("type", "video")
+
+                if lesson_id_filter and lesson_id != lesson_id_filter:
+                    continue
 
                 if lesson_type != "video":
                     log.debug(self._t("log_skipping_non_video", "⏭ Skipping non-video content: {}", lesson_title, **kwargs))
