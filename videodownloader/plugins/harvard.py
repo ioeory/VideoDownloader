@@ -91,7 +91,7 @@ class HarvardPlugin(BasePlugin):
             log.info(self._t("log_starting_ytdlp", "⏳ Starting yt-dlp queue for {}", course_title, **kwargs))
             return self._parse_page_content(html, url, course_dir, cookies, quality, **kwargs)
 
-    def _parse_page_content(self, html: str, url: str, course_dir: Path, cookies: Optional[dict], quality: str) -> List[DownloadTask]:
+    def _parse_page_content(self, html: str, url: str, course_dir: Path, cookies: Optional[dict], quality: str, **kwargs) -> List[DownloadTask]:
         soup = BeautifulSoup(html, "html.parser")
         tasks = []
         seen_urls = set()
