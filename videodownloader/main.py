@@ -136,6 +136,122 @@ def run_tasks(tasks: list[DownloadTask], concurrent: int = 1, delay: float = 1.0
 
 
 # ─────────────────────────────────────────────
+# CLI i18n 支持
+# ─────────────────────────────────────────────
+
+import locale as _locale
+import os
+
+def _detect_cli_lang() -> str:
+    """检测系统语言环境，返回 'zh' 或 'en'"""
+    try:
+        # 优先读取系统环境变量 (解决 POSIX C locale 下 getlocale 拿不到语言的问题)
+        lang = os.environ.get("LANG") or os.environ.get("LC_ALL") or ""
+        if not lang:
+            # 兼容处理
+            try:
+                lang = _locale.getlocale()[0] or ""
+            except AttributeError:
+                pass
+        
+        if lang.lower().startswith("zh"):
+            return "zh"
+    except Exception:
+        pass
+    return "en"
+
+_CLI_LANG = _detect_cli_lang()
+
+_CLI_I18N = {
+    "en": {
+        "prog_desc": "VideoDownloader — Universal Video Downloader",
+        "epilog": """
+Examples:
+  vd download "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+  vd deeplearning --course ai-for-everyone --cookies-file cookies.txt
+  vd deeplearning --course ai-for-everyone --weeks 1 2 -c 2
+  vd coursera --url "https://www.coursera.org/learn/..." --cookies-file cookies.txt
+  vd skillsgoogle --url "https://www.skills.google/paths/1951/..." --cookies-file cookies.txt
+  vd harvard --url "https://cs50.harvard.edu/python/" --quality 1080p
+  vd list-courses
+        """,
+        "cmd_download": "General download (YouTube/Bilibili/Vimeo etc.)",
+        "cmd_deeplearning": "DeepLearning.AI course download",
+        "cmd_coursera": "Coursera course download",
+        "cmd_kodekloud": "KodeKloud course download",
+        "cmd_skillsgoogle": "Skills Google course download",
+        "cmd_harvard": "Harvard course download (CS50 etc.)",
+        "cmd_list_courses": "List built-in DeepLearning.AI courses",
+        "arg_url": "Video URL",
+        "arg_quality": "Quality selection (default: {default})",
+        "arg_subtitle": "Download subtitles",
+        "arg_no_subtitle": "Skip subtitle download",
+        "arg_playlist_items": "Playlist item range (e.g. 1-25, 1,3,5-7)",
+        "arg_cookies_file": "Netscape cookies.txt file path (recommended for WSL)",
+        "arg_cookie_str": 'Manual cookie string, format: "key1=val1; key2=val2"',
+        "arg_browser": "Extract cookies from browser (default: chrome)",
+        "arg_output_dir": "Output directory (default: ./downloads)",
+        "arg_concurrent": "Concurrent downloads (default: 1, recommended ≤ 3)",
+        "arg_verbose": "Enable debug logging (equivalent to --log-level DEBUG)",
+        "arg_log_level": "Set log level (default: INFO)",
+        "arg_course_slug": "Course slug (e.g. ai-for-everyone)",
+        "arg_course_url": "Course page URL",
+        "arg_weeks": "Specific week(s) (e.g. --weeks 1 2), default: all",
+        "arg_kk_url": "KodeKloud course URL",
+        "arg_sg_url": "Skills Google course URL",
+        "arg_hvd_url": "Harvard course/page URL",
+        "arg_crs_url": "Coursera course/video URL",
+    },
+    "zh": {
+        "prog_desc": "VideoDownloader — 通用视频下载器",
+        "epilog": """
+示例:
+  vd download "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+  vd deeplearning --course ai-for-everyone --cookies-file cookies.txt
+  vd deeplearning --course ai-for-everyone --weeks 1 2 -c 2
+  vd coursera --url "https://www.coursera.org/learn/..." --cookies-file cookies.txt
+  vd skillsgoogle --url "https://www.skills.google/paths/1951/..." --cookies-file cookies.txt
+  vd harvard --url "https://cs50.harvard.edu/python/" --quality 1080p
+  vd list-courses
+        """,
+        "cmd_download": "通用下载（YouTube/Bilibili/Vimeo 等）",
+        "cmd_deeplearning": "DeepLearning.AI 课程下载",
+        "cmd_coursera": "Coursera 课程下载",
+        "cmd_kodekloud": "KodeKloud 课程下载",
+        "cmd_skillsgoogle": "Skills Google 课程下载",
+        "cmd_harvard": "Harvard 课程下载 (CS50等)",
+        "cmd_list_courses": "列出内置支持的 DeepLearning.AI 课程",
+        "arg_url": "视频 URL",
+        "arg_quality": "画质选择 (默认: {default})",
+        "arg_subtitle": "下载字幕",
+        "arg_no_subtitle": "不下载字幕",
+        "arg_playlist_items": "指定下载播放列表的范围 (如 1-25, 1,3,5-7)",
+        "arg_cookies_file": "Netscape 格式 cookies.txt 文件路径（WSL 推荐）",
+        "arg_cookie_str": '手动指定 Cookie 字符串，格式: "key1=val1; key2=val2"',
+        "arg_browser": "从哪个浏览器提取 Cookie (默认: chrome)",
+        "arg_output_dir": "视频保存目录 (默认: ./downloads)",
+        "arg_concurrent": "并发下载数 (默认: 1，建议不超过 3)",
+        "arg_verbose": "输出调试日志 (相当于 --log-level DEBUG)",
+        "arg_log_level": "设置日志输出级别 (默认: INFO)",
+        "arg_course_slug": "课程 slug（如 ai-for-everyone）",
+        "arg_course_url": "课程页面 URL",
+        "arg_weeks": "指定 Week（如 --weeks 1 2），默认下载全部",
+        "arg_kk_url": "KodeKloud 课程 URL",
+        "arg_sg_url": "Skills Google 课程 URL",
+        "arg_hvd_url": "Harvard 课程/页面 URL",
+        "arg_crs_url": "Coursera 课程/视频 URL",
+    },
+}
+
+def _t(key: str, **kwargs) -> str:
+    """CLI 翻译助手"""
+    text = _CLI_I18N.get(_CLI_LANG, _CLI_I18N["en"]).get(key, key)
+    if kwargs:
+        text = text.format(**kwargs)
+    return text
+
+
+# ─────────────────────────────────────────────
 # Cookie 参数（公共）
 # ─────────────────────────────────────────────
 
@@ -144,16 +260,16 @@ def _add_cookie_args(parser: argparse.ArgumentParser) -> None:
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--cookies-file", metavar="FILE",
-        help="Netscape 格式 cookies.txt 文件路径（WSL 推荐）",
+        help=_t("arg_cookies_file"),
     )
     group.add_argument(
         "--cookie", metavar="COOKIE_STRING",
-        help='手动指定 Cookie 字符串，格式: "key1=val1; key2=val2"',
+        help=_t("arg_cookie_str"),
     )
     parser.add_argument(
         "-b", "--browser", default="chrome",
         choices=CookieManager.SUPPORTED_BROWSERS,
-        help="从哪个浏览器提取 Cookie (默认: chrome)",
+        help=_t("arg_browser"),
     )
 
 
@@ -161,20 +277,20 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     """公共输出和并发参数"""
     parser.add_argument(
         "-o", "--output-dir", default="./downloads",
-        help="视频保存目录 (默认: ./downloads)",
+        help=_t("arg_output_dir"),
     )
     parser.add_argument(
         "-c", "--concurrent", type=int, default=1, metavar="N",
-        help="并发下载数 (默认: 1，建议不超过 3)",
+        help=_t("arg_concurrent"),
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true",
-        help="输出调试日志 (相当于 --log-level DEBUG)",
+        help=_t("arg_verbose"),
     )
     parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="设置日志输出级别 (默认: INFO)",
+        help=_t("arg_log_level"),
     )
 
 
@@ -361,99 +477,90 @@ def cmd_list_courses(_args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="vd",
-        description="VideoDownloader — 通用视频下载器",
+        description=_t("prog_desc"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-示例:
-  vd download "https://www.youtube.com/watch?v=jNQXAC9IVRw"
-  vd deeplearning --course ai-for-everyone --cookies-file cookies.txt
-  vd deeplearning --course ai-for-everyone --weeks 1 2 -c 2
-  vd coursera --url "https://www.coursera.org/learn/..." --cookies-file cookies.txt
-  vd skillsgoogle --url "https://www.skills.google/paths/1951/..." --cookies-file cookies.txt
-  vd harvard --url "https://cs50.harvard.edu/python/" --quality 1080p
-  vd list-courses
-        """,
+        epilog=_t("epilog"),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # ── download ──
-    p_dl = subparsers.add_parser("download", help="通用下载（YouTube/Bilibili/Vimeo 等）")
-    p_dl.add_argument("url", help="视频 URL")
+    p_dl = subparsers.add_parser("download", help=_t("cmd_download"))
+    p_dl.add_argument("url", help=_t("arg_url"))
     p_dl.add_argument(
         "-q", "--quality", default="best",
         choices=["best", "4k", "1080p", "720p", "480p", "audio"],
-        help="画质选择 (默认: best)",
+        help=_t("arg_quality", default="best"),
     )
-    p_dl.add_argument("--subtitle", action="store_true", help="下载字幕")
-    p_dl.add_argument("--playlist-items", metavar="ITEM_SPEC", help="指定下载播放列表的范围 (如 1-25, 1,3,5-7)")
+    p_dl.add_argument("--subtitle", action="store_true", help=_t("arg_subtitle"))
+    p_dl.add_argument("--playlist-items", metavar="ITEM_SPEC", help=_t("arg_playlist_items"))
     _add_cookie_args(p_dl)
     _add_common_args(p_dl)
     p_dl.set_defaults(func=cmd_download, browser=None)
 
     # ── deeplearning ──
-    p_dai = subparsers.add_parser("deeplearning", aliases=["dai"], help="DeepLearning.AI 课程下载")
+    p_dai = subparsers.add_parser("deeplearning", aliases=["dai"], help=_t("cmd_deeplearning"))
     group = p_dai.add_mutually_exclusive_group()
-    group.add_argument("--course", metavar="SLUG", help="课程 slug（如 ai-for-everyone）")
-    group.add_argument("--url", metavar="URL", help="课程页面 URL")
+    group.add_argument("--course", metavar="SLUG", help=_t("arg_course_slug"))
+    group.add_argument("--url", metavar="URL", help=_t("arg_course_url"))
     p_dai.add_argument(
         "--weeks", type=int, nargs="+", metavar="N",
-        help="指定 Week（如 --weeks 1 2），默认下载全部",
+        help=_t("arg_weeks"),
     )
     _add_cookie_args(p_dai)
     _add_common_args(p_dai)
     p_dai.set_defaults(func=cmd_deeplearning)
 
     # ── coursera ──
-    p_crs = subparsers.add_parser("coursera", help="Coursera 课程下载")
-    p_crs.add_argument("--url", required=True, metavar="URL", help="Coursera 课程/视频 URL")
+    p_crs = subparsers.add_parser("coursera", help=_t("cmd_coursera"))
+    p_crs.add_argument("--url", required=True, metavar="URL", help=_t("arg_crs_url"))
     p_crs.add_argument(
         "-q", "--quality", default="best",
         choices=["best", "720p", "360p"],
-        help="画质选择 (默认: best)",
+        help=_t("arg_quality", default="best"),
     )
-    p_crs.add_argument("--no-subtitle", action="store_true", help="不下载字幕")
+    p_crs.add_argument("--no-subtitle", action="store_true", help=_t("arg_no_subtitle"))
     _add_cookie_args(p_crs)
     _add_common_args(p_crs)
     p_crs.set_defaults(func=cmd_coursera)
 
     # ── kodekloud ──
-    p_kk = subparsers.add_parser("kodekloud", help="KodeKloud 课程下载")
-    p_kk.add_argument("--url", required=True, metavar="URL", help="KodeKloud 课程 URL")
+    p_kk = subparsers.add_parser("kodekloud", help=_t("cmd_kodekloud"))
+    p_kk.add_argument("--url", required=True, metavar="URL", help=_t("arg_kk_url"))
     p_kk.add_argument(
         "-q", "--quality", default="720p",
         choices=["1080p", "720p", "480p", "360p"],
-        help="画质选择 (默认: 720p)",
+        help=_t("arg_quality", default="720p"),
     )
     _add_cookie_args(p_kk)
     _add_common_args(p_kk)
     p_kk.set_defaults(func=cmd_kodekloud)
 
     # ── skillsgoogle ──
-    p_sg = subparsers.add_parser("skillsgoogle", aliases=["skills"], help="Skills Google 课程下载")
-    p_sg.add_argument("--url", required=True, metavar="URL", help="Skills Google 课程 URL")
+    p_sg = subparsers.add_parser("skillsgoogle", aliases=["skills"], help=_t("cmd_skillsgoogle"))
+    p_sg.add_argument("--url", required=True, metavar="URL", help=_t("arg_sg_url"))
     p_sg.add_argument(
         "-q", "--quality", default="1080p",
         choices=["1080p", "720p", "480p", "360p"],
-        help="画质选择 (默认: 1080p)",
+        help=_t("arg_quality", default="1080p"),
     )
     _add_cookie_args(p_sg)
     _add_common_args(p_sg)
     p_sg.set_defaults(func=cmd_skillsgoogle)
 
     # ── harvard ──
-    p_hvd = subparsers.add_parser("harvard", help="Harvard 课程下载 (CS50等)")
-    p_hvd.add_argument("--url", required=True, metavar="URL", help="Harvard 课程/页面 URL")
+    p_hvd = subparsers.add_parser("harvard", help=_t("cmd_harvard"))
+    p_hvd.add_argument("--url", required=True, metavar="URL", help=_t("arg_hvd_url"))
     p_hvd.add_argument(
         "-q", "--quality", default="best",
         choices=["best", "4k", "1080p", "720p", "480p", "360p"],
-        help="画质选择 (默认: best)",
+        help=_t("arg_quality", default="best"),
     )
     _add_cookie_args(p_hvd)
     _add_common_args(p_hvd)
     p_hvd.set_defaults(func=cmd_harvard)
 
     # ── list-courses ──
-    p_list = subparsers.add_parser("list-courses", help="列出内置支持的 DeepLearning.AI 课程")
+    p_list = subparsers.add_parser("list-courses", help=_t("cmd_list_courses"))
     p_list.set_defaults(func=cmd_list_courses)
 
     return parser
