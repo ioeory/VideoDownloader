@@ -264,6 +264,11 @@ def download_with_requests(
             mode = "ab" if resume_pos > 0 else "wb"
             log.info(_t("log_start_requests", "⏳ Starting download: {} (URL: {})", output_file.name, url))
             desc_name = (output_file.name[:25] + "..." + output_file.name[-10:]) if len(output_file.name) > 40 else output_file.name
+            
+            show_tqdm = True
+            if extra_opts and extra_opts.get("noprogress"):
+                show_tqdm = False
+
             with open(output_file, mode) as f, tqdm(
                 total=total,
                 initial=resume_pos,
@@ -271,6 +276,7 @@ def download_with_requests(
                 unit_scale=True,
                 desc=desc_name,
                 ncols=100,
+                disable=not show_tqdm,
             ) as pbar:
                 for chunk in resp.iter_content(chunk_size=64 * 1024):
                     # Check pause/abort via hooks
