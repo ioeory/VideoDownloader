@@ -12,9 +12,12 @@ from pathlib import Path
 from typing import Optional
 
 import requests
+import yt_dlp
 from tqdm import tqdm
 
 from videodownloader.core.utils import HAS_FFMPEG, FFMPEG_PATH, file_is_complete, UserStoppedException
+
+log = logging.getLogger("videodownloader")
 
 
 # ─────────────────────────────────────────────
