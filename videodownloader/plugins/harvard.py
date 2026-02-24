@@ -101,10 +101,12 @@ class HarvardPlugin(BasePlugin):
         mp4_groups = {}
         for a in soup.find_all("a", href=True):
             href = a['href']
-            if href.lower().split('?')[0].endswith('.mp4'):
+            # .download is used by CS50 to force download instead of embed
+            clean_href = re.sub(r'\.download(?=[?#]|$)', '', href.split('?')[0], flags=re.IGNORECASE)
+            if clean_href.lower().endswith('.mp4'):
                 text = a.text.strip().lower()
                 # 分组提取 base url，去除分辨率后缀，如 -1080p, -4k-hdr
-                base = re.sub(r'-(4k|1080p|720p|360p|sdr|hdr).*$', '', href.split('?')[0])
+                base = re.sub(r'-(4k|1080p|720p|360p|sdr|hdr).*$', '', clean_href)
                 if base not in mp4_groups:
                     mp4_groups[base] = []
                 mp4_groups[base].append((href, text))

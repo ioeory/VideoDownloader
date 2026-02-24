@@ -285,7 +285,7 @@ def download_with_requests(
                             "downloaded_bytes": pbar.n,
                             "total_bytes": total,
                             "filename": str(output_file),
-                            "_speed_str": "N/A (requests)"
+                            "_speed_str": f"{pbar.format_dict.get('rate') / 1024 / 1024:.2f} MiB/s" if pbar.format_dict.get('rate') else "计算中..."
                         }
                         for hook in progress_hooks:
                             try:
