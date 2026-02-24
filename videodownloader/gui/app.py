@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 import threading
 import logging
 import sys
@@ -96,6 +96,74 @@ def enable_undo(entry, string_var=None):
     entry.bind("<Control-Z>", on_undo, add="+")
     entry.bind("<Control-y>", on_redo, add="+")
     entry.bind("<Control-Y>", on_redo, add="+")
+
+class CTkMessageBox(ctk.CTkToplevel):
+    def __init__(self, master, title, message, msg_type="info"):
+        super().__init__(master)
+        self.title(title)
+        
+        # Make modal
+        self.transient(master)
+        self.grab_set()
+        
+        self.result = False
+        
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=0)
+        self.grid_columnconfigure(0, weight=1)
+        
+        # Message label
+        lbl = ctk.CTkLabel(self, text=message, wraplength=400, justify="left")
+        lbl.grid(row=0, column=0, padx=30, pady=(30, 20), sticky="nsew")
+        
+        # Button frame
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
+        btn_frame.grid_columnconfigure(0, weight=1)
+        btn_frame.grid_columnconfigure(1, weight=1)
+        
+        # Fallback text since i18n may not have these exact confirm keys mapped yet
+        text_yes = "确认" if getattr(master, 'current_lang', "en") == "zh" else "Yes"
+        text_no = "取消" if getattr(master, 'current_lang', "en") == "zh" else "No"
+        text_ok = "确定" if getattr(master, 'current_lang', "en") == "zh" else "OK"
+            
+        if msg_type == "askyesno":
+            btn_yes = ctk.CTkButton(btn_frame, text=text_yes, command=self._on_yes, width=100)
+            btn_yes.grid(row=0, column=0, padx=10, sticky="e")
+            btn_no = ctk.CTkButton(btn_frame, text=text_no, command=self._on_no, width=100, fg_color="transparent", border_width=1, text_color=("black", "white"))
+            btn_no.grid(row=0, column=1, padx=10, sticky="w")
+        else: # warning or info
+            btn_ok = ctk.CTkButton(btn_frame, text=text_ok, command=self._on_ok, width=120)
+            btn_ok.grid(row=0, column=0, columnspan=2, padx=10)
+            
+        # Adjust size to content automatically then center
+        self.update_idletasks()
+        req_width = self.winfo_reqwidth() + 40
+        req_height = self.winfo_reqheight() + 40
+        req_width = max(req_width, 350)
+        req_height = max(req_height, 150)
+        
+        x = master.winfo_x() + (master.winfo_width() // 2) - (req_width // 2)
+        y = master.winfo_y() + (master.winfo_height() // 2) - (req_height // 2)
+        self.geometry(f"{req_width}x{req_height}+{x}+{y}")
+        self.resizable(False, False)
+        
+    def _on_yes(self):
+        self.result = True
+        self.destroy()
+        
+    def _on_no(self):
+        self.result = False
+        self.destroy()
+        
+    def _on_ok(self):
+        self.result = True
+        self.destroy()
+
+def show_custom_message(master, title, message, msg_type="info"):
+    dialog = CTkMessageBox(master, title, message, msg_type)
+    master.wait_window(dialog)
+    return dialog.result
 
 class VideoDownloaderApp(ctk.CTk):
     def __init__(self):
@@ -913,7 +981,7 @@ class VideoDownloaderApp(ctk.CTk):
             self.pause_event.clear()
 
     def stop_download(self):
-        if messagebox.askyesno(self.t("confirm_title"), self.t("confirm_stop")):
+        if show_custom_message(self, self.t("confirm_title"), self.t("confirm_stop"), "askyesno"):
             self.is_stopped = True
             self.is_paused = False
             self.pause_event.set() # Unblock if paused
@@ -1012,7 +1080,7 @@ class VideoDownloaderApp(ctk.CTk):
     def start_download(self):
         url = self.entry_url.get().strip()
         if not url:
-            messagebox.showwarning(self.t("warning"), self.t("enter_url"))
+            show_custom_message(self, self.t("warning"), self.t("enter_url"), "warning")
             return
             
         self.is_stopped = False
@@ -1306,9 +1374,11 @@ class VideoDownloaderApp(ctk.CTk):
                     if len(error_msg_lines) > max_display:
                         display_text += f"\n...and {len(error_msg_lines) - max_display} more"
                         
-                    self.after(0, lambda: messagebox.showwarning(
+                    self.after(0, lambda: show_custom_message(
+                        self,
                         self.t("msg_tasks_fail_title"),
-                        self.t("msg_tasks_fail_body").format(len(error_msg_lines), display_text)
+                        self.t("msg_tasks_fail_body").format(len(error_msg_lines), display_text),
+                        "warning"
                     ))
                 else:
                     log.info("=" * 60)
