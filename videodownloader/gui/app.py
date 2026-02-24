@@ -13,7 +13,7 @@ from pathlib import Path
 # Videodownloader imports
 from videodownloader.core.cookies import CookieManager
 from videodownloader.core.downloader import DownloadTask
-from videodownloader.core.utils import setup_logging
+from videodownloader.core.utils import setup_logging, UserStoppedException
 from videodownloader.plugins.generic_ytdlp import GenericYtdlpPlugin
 from videodownloader.plugins.harvard import HarvardPlugin
 from videodownloader.plugins.deeplearning_ai import DeepLearningPlugin
@@ -990,13 +990,13 @@ class VideoDownloaderApp(ctk.CTk):
 
     def progress_hook(self, d):
         if self.is_stopped:
-            raise ValueError("USER_STOPPED")
+            raise UserStoppedException("USER_STOPPED")
             
         if self.is_paused:
             self.after(0, lambda: self.lbl_status.configure(text=f"{self.t('paused_stat')}{Path(d.get('filename', '')).name}"))
             self.pause_event.wait()
             if self.is_stopped:
-                raise ValueError("USER_STOPPED")
+                raise UserStoppedException("USER_STOPPED")
 
         if d['status'] == 'downloading':
             try:
@@ -1295,11 +1295,11 @@ class VideoDownloaderApp(ctk.CTk):
                             failed_tasks.append(display_name + " (Includes failed items)")
                         else:
                             failed_tasks.append(display_name)
-                    except Exception as task_err:
-                        if "USER_STOPPED" in str(task_err) or "yt_dlp" in str(task_err):
+                    except BaseException as task_err:
+                        if "USER_STOPPED" in str(task_err) or "yt_dlp" in str(task_err) or isinstance(task_err, UserStoppedException):
                             if self.is_stopped:
                                 log.warning(f"🚫 {self.t('log_task_terminated')}: {display_name}")
-                                break
+                                break # Force break outer loop
                         has_error = True
                         log.exception(f"❌ {self.t('log_task_exception').format(display_name, task_err)}")
             else:

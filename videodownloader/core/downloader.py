@@ -12,12 +12,9 @@ from pathlib import Path
 from typing import Optional
 
 import requests
-import yt_dlp
 from tqdm import tqdm
 
-from videodownloader.core.utils import HAS_FFMPEG, FFMPEG_PATH, file_is_complete
-
-log = logging.getLogger("videodownloader")
+from videodownloader.core.utils import HAS_FFMPEG, FFMPEG_PATH, file_is_complete, UserStoppedException
 
 
 # ─────────────────────────────────────────────
@@ -208,12 +205,11 @@ def download_with_ytdlp(
              if actual_size < expected_size * 0.90: # 简单容差
                  log.warning(_t("log_size_mismatch", "⚠️ Downloaded file ({} bytes) is much smaller than expected ({} bytes), please check {}", actual_size, expected_size, output_file.name))
         
-        if retcode != 0:
-            log.warning(_t("log_partial_failed", "⚠️ Some tasks or items in the playlist failed to download."))
-            return "partial"
-            
         log.info(_t("log_download_complete", "✅ Download complete: {} (URL: {})", output_file.name, url))
         return "success"
+    except UserStoppedException:
+        log.info(_t("log_user_stopped_dl", "🚫 User stopped download: {}", filename))
+        return "error"
     except yt_dlp.utils.DownloadError as e:
         log.error(_t("log_ytdlp_failed", "❌ yt-dlp download failed ({}): {}", filename, e))
         return "error"
@@ -291,8 +287,8 @@ def download_with_requests(
                         for hook in progress_hooks:
                             try:
                                 hook(mock_d)
-                            except Exception as hook_err:
-                                if str(hook_err) == "USER_STOPPED":
+                            except BaseException as hook_err:
+                                if "USER_STOPPED" in str(hook_err) or isinstance(hook_err, UserStoppedException):
                                     log.info(_t("log_user_stopped_dl", "🚫 User stopped download: {}", filename))
                                     return "error"
                                 raise hook_err
@@ -309,6 +305,9 @@ def download_with_requests(
                 
         log.info(_t("log_download_complete", "✅ Download complete: {} (URL: {})", output_file.name, url))
         return "success"
+    except UserStoppedException:
+        log.info(_t("log_user_stopped_dl", "🚫 User stopped download: {}", filename))
+        return "error"
     except requests.RequestException as e:
         log.error(_t("log_requests_failed", "❌ requests download failed ({}): {}", filename, e))
         return "error"

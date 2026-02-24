@@ -50,6 +50,10 @@ def get_ffmpeg_path() -> Optional[str]:
 FFMPEG_PATH = get_ffmpeg_path()
 HAS_FFMPEG = FFMPEG_PATH is not None
 
+class UserStoppedException(BaseException):
+    """Exception used to force interrupt underlying downloading routines (like yt-dlp or tqdm)."""
+    pass
+
 
 def is_wsl() -> bool:
     """检测当前是否运行于 WSL 环境"""
