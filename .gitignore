@@ -27,6 +27,8 @@ downloads/
 
 # Project specific
 kk_app.js
+*.spec
+*.code-workspace
 
 
 # tmp html
