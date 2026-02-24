@@ -163,9 +163,10 @@ def download_with_ytdlp(
 
                 entries = info_dict.get('entries')
                 if entries:
-                    video_info = entries[0]
+                    # In some Edge cases with unavailable videos, the entry might be None
+                    video_info = entries[0] if entries[0] is not None else {}
                 else:
-                    video_info = info_dict
+                    video_info = info_dict or {}
 
                 # 尝试获取视频大小
                 expected_size = video_info.get("filesize") or video_info.get("filesize_approx")
