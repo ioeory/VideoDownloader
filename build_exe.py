@@ -47,6 +47,10 @@ def build():
             print("         请在打包时添加参数： python build_exe.py --with-node")
             print("         (当前采用默认行为：未打包 Node.js 以控制包体积)")
 
+    # 显式带上 CDP 提取依赖（函数内 import 时 PyInstaller 可能漏打）
+    pyinstaller_args.append('--hidden-import=websocket')
+    pyinstaller_args.append('--hidden-import=videodownloader.core.kodekloud_cdp')
+
     # 为了更好的兼容性，特别是 Linux 打包给 Linux (由于我们是在 WSL 下开发，实际打包的出的是 ELF 二进制，如果要在 Windows 运行需在 Windows 下打包)
     print("=" * 60)
     print("🚀 开始使用 PyInstaller 构建 GUI 独立程序...")

@@ -14,6 +14,7 @@ from pathlib import Path
 from videodownloader.core.cookies import CookieManager
 from videodownloader.core.downloader import DownloadTask
 from videodownloader.core.utils import setup_logging, UserStoppedException
+from videodownloader.core import kodekloud_cdp as _kodekloud_cdp  # noqa: F401  # PyInstaller
 from videodownloader.plugins.generic_ytdlp import GenericYtdlpPlugin
 from videodownloader.plugins.harvard import HarvardPlugin
 from videodownloader.plugins.deeplearning_ai import DeepLearningPlugin
@@ -214,6 +215,9 @@ class VideoDownloaderApp(ctk.CTk):
                 "cookie_brave": "Brave Browser",
                 "cookie_clipboard": "Clipboard (Paste text)",
                 "cookie_file": "Select cookies.txt...",
+                "cookie_kk_auto": "KodeKloud Auto Token (Brave/Edge/Chrome)",
+                "kk_auto_title": "KodeKloud Login",
+                "kk_auto_prompt": "A browser window will open.\n1) Sign in to KodeKloud\n2) Open any course lesson\n3) Click Yes here to extract session-cookie",
                 "warning": "Warning",
                 "enter_url": "Please enter URL or Course Slug",
                 "paused_stat": "Paused: ",
@@ -275,6 +279,9 @@ class VideoDownloaderApp(ctk.CTk):
                 "cookie_brave": "Brave 浏览器",
                 "cookie_clipboard": "剪贴板 (粘贴文本)",
                 "cookie_file": "选择 cookies.txt...",
+                "cookie_kk_auto": "KodeKloud 自动提取 Token (Brave/Edge/Chrome)",
+                "kk_auto_title": "KodeKloud 登录",
+                "kk_auto_prompt": "将打开你填写的课程页。\n确认已登录并能打开课程后点「是」提取 session-cookie。\n（若弹出临时窗口，请先登录再点「是」。）",
                 "warning": "警告",
                 "enter_url": "请输入 URL 或 Course Slug",
                 "paused_stat": "已暂停: ",
@@ -339,6 +346,9 @@ class VideoDownloaderApp(ctk.CTk):
                 "cookie_brave": "Brave Browser",
                 "cookie_clipboard": "Clipboard (Paste text)",
                 "cookie_file": "Select cookies.txt...",
+                "cookie_kk_auto": "KodeKloud Auto Token (Brave/Edge/Chrome)",
+                "kk_auto_title": "KodeKloud Login",
+                "kk_auto_prompt": "A browser window will open.\n1) Sign in to KodeKloud\n2) Open any course lesson\n3) Click Yes here to extract session-cookie",
                 "warning": "Warning",
                 "enter_url": "Please enter URL or Course Slug",
                 "paused_stat": "Paused: ",
@@ -417,7 +427,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_api_url": "API got video URL: {}...",
                 "log_html_failed": "HTML parsing failed ({}): {}",
                 "log_cookie_required": "🚫 Cookie required for this platform.",
-                "log_session_cookie_missing": "🚫 Missing 'session-cookie' in your cookies. Make sure you are logged in.",
+                "log_session_cookie_missing": "🚫 Missing auth token ('_secure-user-session' or 'session-cookie'). Make sure you are logged in.",
                 "log_fetching_course_info": "⏳ Fetching course info: {}",
                 "log_course_structure_error": "❌ Failed to fetch course structure: {}",
                 "log_modules_found": "Found {} modules",
@@ -463,6 +473,9 @@ class VideoDownloaderApp(ctk.CTk):
                 "cookie_brave": "Brave 浏览器",
                 "cookie_clipboard": "剪贴板 (粘贴文本)",
                 "cookie_file": "选择 cookies.txt...",
+                "cookie_kk_auto": "KodeKloud 自动提取 Token (Brave/Edge/Chrome)",
+                "kk_auto_title": "KodeKloud 登录",
+                "kk_auto_prompt": "将打开你填写的课程页。\n确认已登录并能打开课程后点「是」提取 session-cookie。\n（若弹出临时窗口，请先登录再点「是」。）",
                 "warning": "警告",
                 "enter_url": "请输入 URL 或 Course Slug",
                 "paused_stat": "已暂停: ",
@@ -541,7 +554,7 @@ class VideoDownloaderApp(ctk.CTk):
                 "log_api_url": "API 获取视频 URL: {}...",
                 "log_html_failed": "HTML 页面解析失败 ({}): {}",
                 "log_cookie_required": "🚫 此平台下载需要有效的 Cookie。",
-                "log_session_cookie_missing": "🚫 在 Cookie 中找不到 'session-cookie' (JWT)。请确保使用了正确的登录信息。",
+                "log_session_cookie_missing": "🚫 在 Cookie 中找不到鉴权 Token（'_secure-user-session' 或 'session-cookie'）。请确保已登录。",
                 "log_fetching_course_info": "⏳ 正在获取课程信息: {}",
                 "log_course_structure_error": "❌ 无法获取课程结构: {}",
                 "log_modules_found": "找到模块数: {}",
@@ -637,7 +650,7 @@ class VideoDownloaderApp(ctk.CTk):
         
         self.cookie_src_var = ctk.StringVar(value=self.t("cookie_none"))
         self.combo_cookie_src = ctk.CTkComboBox(self.frame_config, variable=self.cookie_src_var, state="readonly",
-            values=[self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')],
+            values=[self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_kk_auto'), self.t('cookie_clipboard'), self.t('cookie_file')],
             command=self.on_cookie_src_change)
         self.combo_cookie_src.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
         
@@ -775,7 +788,7 @@ class VideoDownloaderApp(ctk.CTk):
                     src = config["cookie_src"]
                     
                     target_key = "cookie_none"
-                    for b_key in ['cookie_none', 'cookie_chrome', 'cookie_edge', 'cookie_firefox', 'cookie_brave', 'cookie_clipboard', 'cookie_file']:
+                    for b_key in ['cookie_none', 'cookie_chrome', 'cookie_edge', 'cookie_firefox', 'cookie_brave', 'cookie_kk_auto', 'cookie_clipboard', 'cookie_file']:
                         en_val = self.i18n.get('en', {}).get(b_key, b_key)
                         zh_val = self.i18n.get('zh', {}).get(b_key, b_key)
                         if (en_val and en_val in src) or (zh_val and zh_val in src) or b_key in src:
@@ -865,7 +878,7 @@ class VideoDownloaderApp(ctk.CTk):
             self.lbl_status.configure(text=self.t("waiting"))
             
         # Update combo cookie values
-        cv = [self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_clipboard'), self.t('cookie_file')]
+        cv = [self.t('cookie_none'), self.t('cookie_chrome'), self.t('cookie_edge'), self.t('cookie_firefox'), self.t('cookie_brave'), self.t('cookie_kk_auto'), self.t('cookie_clipboard'), self.t('cookie_file')]
         self.combo_cookie_src.configure(values=cv)
         
         # Translate the currently selected cookie source
@@ -874,7 +887,7 @@ class VideoDownloaderApp(ctk.CTk):
         for lang_code in ['en', 'zh']:
             if not hasattr(self, 'i18n'): break
             lang_dict = self.i18n.get(lang_code, {})
-            for key in ['cookie_none', 'cookie_chrome', 'cookie_edge', 'cookie_firefox', 'cookie_brave', 'cookie_clipboard', 'cookie_file']:
+            for key in ['cookie_none', 'cookie_chrome', 'cookie_edge', 'cookie_firefox', 'cookie_brave', 'cookie_kk_auto', 'cookie_clipboard', 'cookie_file']:
                 if lang_dict.get(key) == current_cookie_src:
                     target_key = key
                     break
@@ -961,6 +974,55 @@ class VideoDownloaderApp(ctk.CTk):
             self.cookie_val_var.set("")
             self.entry_cookie_val.configure(state="normal")
             self.entry_cookie_val.focus()
+        elif choice == self.t("cookie_kk_auto"):
+            self.cookie_val_var.set("")
+            self.entry_cookie_val.configure(state="disabled")
+            try:
+                from videodownloader.core.kodekloud_cdp import (
+                    CDP_PORT_DEFAULT,
+                    _pick_ws_url,
+                    extract_kodekloud_session_token,
+                    is_browser_running,
+                    launch_browser_with_cdp,
+                    launch_browser_with_user_profile,
+                )
+                course_url = self.entry_url.get().strip()
+                if not _pick_ws_url(CDP_PORT_DEFAULT):
+                    # Brave 已退出 → 用真实配置（已登录）；否则临时窗口需重新登录
+                    if not is_browser_running("brave"):
+                        try:
+                            launch_browser_with_user_profile(
+                                "brave", CDP_PORT_DEFAULT, start_url=course_url
+                            )
+                        except Exception as e:
+                            log.warning("真实配置启动失败，改用临时窗口: %s", e)
+                            proc, _ = launch_browser_with_cdp(
+                                CDP_PORT_DEFAULT, start_url=course_url
+                            )
+                            if proc is None:
+                                raise RuntimeError("未能启动 Brave/Edge/Chrome") from e
+                    else:
+                        proc, _ = launch_browser_with_cdp(
+                            CDP_PORT_DEFAULT, start_url=course_url
+                        )
+                        if proc is None:
+                            raise RuntimeError("未能启动 Brave/Edge/Chrome")
+                if not show_custom_message(self, self.t("kk_auto_title"), self.t("kk_auto_prompt"), "askyesno"):
+                    self.cookie_src_var.set(self.t("cookie_none"))
+                    return
+                token = extract_kodekloud_session_token(
+                    port=CDP_PORT_DEFAULT,
+                    auto_launch=False,
+                    wait_login_seconds=12,
+                    start_url=course_url,
+                )
+                self.cookie_src_var.set(self.t("cookie_clipboard"))
+                self.cookie_val_var.set(token)
+                self.entry_cookie_val.configure(state="normal")
+                log.info("KodeKloud session-cookie extracted via CDP (%s chars)", len(token))
+            except Exception as e:
+                show_custom_message(self, self.t("warning"), str(e), "showerror")
+                self.cookie_src_var.set(self.t("cookie_none"))
         else:
             self.cookie_val_var.set("")
             self.entry_cookie_val.configure(state="disabled")
@@ -1139,6 +1201,8 @@ class VideoDownloaderApp(ctk.CTk):
             browser_name_for_opts = None
             if manager_kwargs:
                 manager_kwargs["domain_filter"] = domain_filter
+                if "KodeKloud" in platform:
+                    manager_kwargs["page_url"] = url
                 log.info(f"{self.t('log_cookie_try')} ({cookie_src})...")
                 manager = CookieManager(**manager_kwargs)
                 try:
@@ -1146,6 +1210,13 @@ class VideoDownloaderApp(ctk.CTk):
                     log.info(f"{self.t('log_cookie_succ')}{len(cookies)}{self.t('log_cookie_succ2')}")
                 except Exception as e:
                     log.warning(f"{self.t('log_cookie_fail')}{e}")
+                    if "KodeKloud" in platform and "browser" in manager_kwargs:
+                        log.warning(
+                            "KodeKloud + 浏览器读取失败时，请任选其一：\n"
+                            "  1) 完全退出 Brave（托盘图标右键退出）后再点下载\n"
+                            "  2) Cookie 来源改选「KodeKloud 自动提取 Token」\n"
+                            "  3) Brave F12 → Application → Cookies → 复制 session-cookie 到「剪贴板」"
+                        )
                 
                 # 如果是直接从浏览器提取，记录浏览器名供 yt-dlp 兜底
                 if "browser" in manager_kwargs:
