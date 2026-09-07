@@ -1,0 +1,105 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller websocket-client pycryptodomex pywin32
+
+      - name: Resolve version / artifact names
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            RAW="${GITHUB_REF_NAME}"
+            VER="${RAW#v}"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+            echo "version=${VER}" >> "$GITHUB_OUTPUT"
+            echo "asset_name=VideoDownloader-${VER}-windows.exe" >> "$GITHUB_OUTPUT"
+          else
+            SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo "asset_name=VideoDownloader-windows.exe" >> "$GITHUB_OUTPUT"
+            echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build executable
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: python build_exe.py
+
+      - name: Prepare release asset
+        shell: bash
+        run: |
+          test -f dist/VideoDownloader.exe
+          cp dist/VideoDownloader.exe "dist/${{ steps.meta.outputs.asset_name }}"
+          ls -lh dist/
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.asset_name }}
+          path: dist/${{ steps.meta.outputs.asset_name }}
+          if-no-files-found: error
+          retention-days: 90
+
+      # 无 tag：更新固定 latest Release（不含版本号）
+      - name: Publish / update latest release
+        if: steps.meta.outputs.is_tag != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          prerelease: true
+          make_latest: false
+          files: dist/${{ steps.meta.outputs.asset_name }}
+          body: |
+            自动构建（无版本号）
+
+            - Branch: `${{ github.ref_name }}`
+            - Commit: `${{ github.sha }}`
+            - Artifact: `${{ steps.meta.outputs.asset_name }}`
+
+            正式版本请打 `v*` tag（例如 `v1.2.3`）。
+          fail_on_unmatched_files: true
+
+      # 有 tag：用 tag 作为版本号发布正式 Release
+      - name: Publish tagged release
+        if: steps.meta.outputs.is_tag == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: VideoDownloader ${{ steps.meta.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: dist/${{ steps.meta.outputs.asset_name }}
+          fail_on_unmatched_files: true
