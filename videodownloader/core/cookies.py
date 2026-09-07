@@ -7,6 +7,7 @@
 import base64
 import json
 import logging
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -19,7 +20,7 @@ from videodownloader.core.utils import get_windows_username, is_wsl
 
 log = logging.getLogger("videodownloader")
 
-# Windows 浏览器 Cookie 路径映射
+# Windows 浏览器 Cookie 路径映射（相对用户主目录 / LOCALAPPDATA 逻辑）
 _WIN_BROWSER_COOKIE_PATHS = {
     "brave":    "AppData/Local/BraveSoftware/Brave-Browser/User Data",
     "chrome":   "AppData/Local/Google/Chrome/User Data",
@@ -27,6 +28,15 @@ _WIN_BROWSER_COOKIE_PATHS = {
     "vivaldi":  "AppData/Local/Vivaldi/User Data",
     "opera":    "AppData/Roaming/Opera Software/Opera Stable",
     "chromium": "AppData/Local/Chromium/User Data",
+}
+
+_WIN_BROWSER_USER_DATA_NATIVE = {
+    "brave":    ("LOCALAPPDATA", "BraveSoftware/Brave-Browser/User Data"),
+    "chrome":   ("LOCALAPPDATA", "Google/Chrome/User Data"),
+    "edge":     ("LOCALAPPDATA", "Microsoft/Edge/User Data"),
+    "vivaldi":  ("LOCALAPPDATA", "Vivaldi/User Data"),
+    "opera":    ("APPDATA", "Opera Software/Opera Stable"),
+    "chromium": ("LOCALAPPDATA", "Chromium/User Data"),
 }
 
 
@@ -80,13 +90,26 @@ def write_netscape_cookies(cookies: dict, filepath: Path, domain: str = ".exampl
 # ─────────────────────────────────────────────
 
 def parse_cookie_string(cookie_str: str) -> dict:
-    """解析手动提供的 Cookie 字符串，格式: key1=val1; key2=val2"""
-    cookie_str = cookie_str.strip()
-    
-    # 用户有可能直接粘贴了一串 JWT 或者 Base64 token，而不是完整的 key=value 形式
+    """解析手动提供的 Cookie 字符串，格式: key1=val1; key2=val2
+
+    也支持直接粘贴 JWT / ``Bearer <jwt>``（KodeKloud 等场景）。
+    """
+    cookie_str = cookie_str.strip().strip('"').strip("'")
+
+    # 去掉常见前缀，避免用户从 Network 面板整段复制
+    lowered = cookie_str.lower()
+    for prefix in ("authorization:", "bearer "):
+        if lowered.startswith(prefix):
+            cookie_str = cookie_str[len(prefix):].strip().strip('"').strip("'")
+            lowered = cookie_str.lower()
+
+    # 看起来像 JWT：三段 base64url，允许段内有 padding '='
+    if _looks_like_jwt(cookie_str):
+        return {"__raw_token__": cookie_str}
+
+    # 用户有可能直接粘贴了一串长 token（无等号 / 仅末尾 padding）
     if ";" not in cookie_str:
         if "=" not in cookie_str or cookie_str.index("=") > len(cookie_str) - 3:
-            # 没有等号，或等号只出现在末尾（Base64 padding）
             return {"__raw_token__": cookie_str}
 
     cookies: dict = {}
@@ -94,15 +117,31 @@ def parse_cookie_string(cookie_str: str) -> dict:
         part = part.strip()
         if "=" in part:
             k, v = part.split("=", 1)
-            cookies[k.strip()] = v.strip()
-            
+            cookies[k.strip()] = v.strip().strip('"').strip("'")
+
     # 如果解析出来只有 1 个，并且 value 为空，极大概率也是误将带 padding 的 token 当做 key
     if len(cookies) == 1:
         k, v = list(cookies.items())[0]
         if not v and len(k) > 20:
             return {"__raw_token__": cookie_str}
-            
+        # session-cookie=<jwt> 或单键值里的 value 本身是 JWT
+        if _looks_like_jwt(v):
+            return {"__raw_token__": v, k: v}
+
     return cookies
+
+
+def _looks_like_jwt(value: str) -> bool:
+    """粗判是否为 JWT（不校验签名）。"""
+    if not value or value.count(".") != 2:
+        return False
+    header, payload, signature = value.split(".")
+    if len(header) < 10 or len(payload) < 10 or len(signature) < 10:
+        return False
+    # JWT 头通常以 eyJ ( {" ) 开头
+    return header.startswith("eyJ") and all(
+        c.isalnum() or c in "-_=" for c in value if c != "."
+    )
 
 
 # ─────────────────────────────────────────────
@@ -111,8 +150,8 @@ def parse_cookie_string(cookie_str: str) -> dict:
 
 def _decrypt_windows_cookie_value(encrypted_value: bytes, local_state_path: Path) -> Optional[str]:
     """
-    通过 PowerShell 调用 Windows DPAPI 解密 Chrome 系浏览器 Cookie 值。
-    Chrome v80+ 使用 AES-256-GCM，密钥存在 Local State 文件中，由 DPAPI 加密。
+    解密 Chrome 系浏览器 Cookie 值（AES-256-GCM，密钥由 DPAPI 保护）。
+    原生 Windows 优先用 win32crypt；否则回退 PowerShell DPAPI。
     """
     if not encrypted_value:
         return None
@@ -127,27 +166,38 @@ def _decrypt_windows_cookie_value(encrypted_value: bytes, local_state_path: Path
     except Exception:
         return None
 
-    key_b64 = base64.b64encode(encrypted_key).decode()
-    ps_cmd = (
-        f"$bytes = [Convert]::FromBase64String('{key_b64}'); "
-        "$decrypted = [System.Security.Cryptography.ProtectedData]::Unprotect("
-        "$bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser); "
-        "[Convert]::ToBase64String($decrypted)"
-    )
-    try:
-        result = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-Command", ps_cmd],
-            capture_output=True, text=True, timeout=15,
+    aes_key = None
+    # 原生 Windows：win32crypt
+    if sys.platform == "win32":
+        try:
+            import win32crypt  # type: ignore
+            aes_key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]
+        except Exception:
+            aes_key = None
+
+    if aes_key is None:
+        key_b64 = base64.b64encode(encrypted_key).decode()
+        ps_cmd = (
+            f"$bytes = [Convert]::FromBase64String('{key_b64}'); "
+            "$decrypted = [System.Security.Cryptography.ProtectedData]::Unprotect("
+            "$bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser); "
+            "[Convert]::ToBase64String($decrypted)"
         )
-        if result.returncode != 0 or not result.stdout.strip():
+        try:
+            result = subprocess.run(
+                ["powershell.exe", "-NoProfile", "-Command", ps_cmd],
+                capture_output=True, text=True, timeout=15,
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                return None
+            aes_key = base64.b64decode(result.stdout.strip())
+        except Exception:
             return None
-        aes_key = base64.b64decode(result.stdout.strip())
-    except Exception:
-        return None
 
     try:
         from Cryptodome.Cipher import AES  # type: ignore
-        if encrypted_value[:3] != b"v10":
+        prefix = encrypted_value[:3]
+        if prefix not in (b"v10", b"v11"):
             return None
         iv = encrypted_value[3:15]
         payload = encrypted_value[15:]
@@ -159,6 +209,166 @@ def _decrypt_windows_cookie_value(encrypted_value: bytes, local_state_path: Path
         return None
     except Exception:
         return None
+
+
+def _copy_locked_file(src: Path, dst: Path) -> None:
+    """尽量在浏览器锁定 Cookie DB 时仍能复制（共享读 / 回退普通复制）。"""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    last_err: Optional[Exception] = None
+    if sys.platform == "win32":
+        try:
+            import win32file  # type: ignore
+            import win32con  # type: ignore
+            handle = win32file.CreateFile(
+                str(src),
+                win32con.GENERIC_READ,
+                win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE,
+                None,
+                win32con.OPEN_EXISTING,
+                win32con.FILE_ATTRIBUTE_NORMAL,
+                None,
+            )
+            try:
+                chunks = []
+                while True:
+                    hr, data = win32file.ReadFile(handle, 1024 * 1024)
+                    if not data:
+                        break
+                    chunks.append(data)
+                dst.write_bytes(b"".join(chunks))
+                if dst.stat().st_size > 0:
+                    return
+            finally:
+                win32file.CloseHandle(handle)
+        except Exception as e:
+            last_err = e
+
+        try:
+            result = subprocess.run(
+                [
+                    "powershell.exe", "-NoProfile", "-Command",
+                    f"Copy-Item -LiteralPath '{src}' -Destination '{dst}' -Force",
+                ],
+                capture_output=True, text=True, timeout=20,
+            )
+            if result.returncode == 0 and dst.exists() and dst.stat().st_size > 0:
+                return
+            if result.returncode != 0:
+                last_err = RuntimeError(result.stderr.strip() or result.stdout.strip() or "Copy-Item failed")
+        except Exception as e:
+            last_err = e
+
+    try:
+        shutil.copy2(src, dst)
+        return
+    except Exception as e:
+        last_err = e
+
+    raise OSError(
+        f"无法复制 Cookie 数据库（浏览器可能正在占用）: {src}. "
+        f"请完全退出 {src.parts[-4] if len(src.parts) >= 4 else '浏览器'} 后重试。"
+        + (f" 原因: {last_err}" if last_err else "")
+    )
+
+
+def _iter_browser_profiles(user_data_dir: Path) -> list[Path]:
+    profiles: list[Path] = []
+    for name in ["Default", "Profile 1", "Profile 2", "Profile 3"]:
+        p = user_data_dir / name
+        if p.is_dir():
+            profiles.append(p)
+    # 其它 Profile N
+    for p in sorted(user_data_dir.glob("Profile *")):
+        if p.is_dir() and p not in profiles:
+            profiles.append(p)
+    return profiles
+
+
+def _load_cookies_from_db(cookie_db: Path, local_state: Path, domain_filter: Optional[str]) -> dict:
+    tmp = Path(tempfile.mkdtemp()) / "Cookies.db"
+    try:
+        _copy_locked_file(cookie_db, tmp)
+        conn = sqlite3.connect(str(tmp))
+        try:
+            if domain_filter:
+                rows = conn.execute(
+                    "SELECT name, value, encrypted_value FROM cookies WHERE host_key LIKE ?",
+                    (f"%{domain_filter}%",),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT name, value, encrypted_value FROM cookies"
+                ).fetchall()
+        finally:
+            conn.close()
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+            tmp.parent.rmdir()
+        except Exception:
+            pass
+
+    cookies: dict = {}
+    for name, value, encrypted_value in rows:
+        if value:
+            cookies[name] = value
+        elif encrypted_value:
+            decrypted = _decrypt_windows_cookie_value(encrypted_value, local_state)
+            if decrypted:
+                cookies[name] = decrypted
+    return cookies
+
+
+def get_native_windows_browser_cookies(browser: str, domain_filter: Optional[str] = None) -> dict:
+    """
+    原生 Windows：直接读取 Chromium 系 Cookie DB（不依赖 browser_cookie3，无需管理员）。
+    会扫描多个 Profile，合并匹配域名的 Cookie。
+    """
+    if sys.platform != "win32":
+        raise RuntimeError("仅支持原生 Windows")
+
+    meta = _WIN_BROWSER_USER_DATA_NATIVE.get(browser.lower())
+    if not meta:
+        raise ValueError(f"不支持的浏览器: {browser}")
+    env_key, rel = meta
+    base = Path(os.environ.get(env_key, "")) / rel
+    if not base.exists():
+        raise FileNotFoundError(f"浏览器数据目录不存在: {base}")
+
+    local_state = base / "Local State"
+    if not local_state.exists():
+        raise FileNotFoundError(f"未找到 Local State: {local_state}")
+
+    merged: dict = {}
+    scanned = 0
+    for profile in _iter_browser_profiles(base):
+        cookie_db = None
+        for sub in ("Network/Cookies", "Cookies"):
+            p = profile / sub
+            if p.exists():
+                cookie_db = p
+                break
+        if not cookie_db:
+            continue
+        scanned += 1
+        try:
+            part = _load_cookies_from_db(cookie_db, local_state, domain_filter)
+            if part:
+                log.info("从 %s/%s 读取到 %s 个 Cookie", browser, profile.name, len(part))
+                merged.update(part)
+        except Exception as e:
+            log.warning("读取 %s 失败: %s", cookie_db, e)
+
+    if scanned == 0:
+        raise FileNotFoundError(f"未找到 {browser} Cookie 数据库")
+    if not merged:
+        raise RuntimeError(
+            f"在 {browser} 中未找到匹配 Cookie"
+            + (f"（域名过滤: {domain_filter}）" if domain_filter else "")
+            + "。请先在该浏览器登录目标网站后再试。"
+        )
+    log.info("成功从 %s 获取 %s 个 Cookie（无需管理员）", browser, len(merged))
+    return merged
 
 
 def get_wsl_browser_cookies(browser: str, domain_filter: Optional[str] = None) -> dict:
@@ -272,11 +482,13 @@ class CookieManager:
         cookie_str: Optional[str] = None,
         browser: str = "chrome",
         domain_filter: Optional[str] = None,
+        page_url: Optional[str] = None,
     ):
         self.cookies_file = cookies_file
         self.cookie_str = cookie_str
         self.browser = browser
         self.domain_filter = domain_filter
+        self.page_url = page_url
 
     def get(self) -> dict:
         """获取 Cookie 字典"""
@@ -310,7 +522,46 @@ class CookieManager:
             )
             raise RuntimeError("WSL 自动提取 Cookie 失败")
 
-        # 非 WSL：使用 browser_cookie3
+        # 原生 Windows：优先直接读 Cookie DB（无需管理员，支持 Brave）
+        native_err: Optional[Exception] = None
+        if sys.platform == "win32" and self.browser.lower() in _WIN_BROWSER_USER_DATA_NATIVE:
+            try:
+                return get_native_windows_browser_cookies(self.browser, self.domain_filter)
+            except Exception as e:
+                native_err = e
+                log.warning(f"直接读取 {self.browser} Cookie 失败，回退 browser_cookie3: {e}")
+
+        # KodeKloud：Cookie DB 不可用时，用真实配置 + CDP 提取 HttpOnly session-cookie
+        domain = (self.domain_filter or "").lower()
+        if "kodekloud" in domain and self.browser.lower() in ("brave", "chrome", "edge"):
+            try:
+                from videodownloader.core.kodekloud_cdp import (
+                    extract_kodekloud_from_user_profile,
+                    is_browser_running,
+                )
+                if is_browser_running(self.browser):
+                    log.info(
+                        "%s 仍在运行，将结束进程后用 CDP 读取已登录配置…",
+                        self.browser,
+                    )
+                log.info("Cookie DB 不可用，改用 CDP + 真实 %s 配置提取 session-cookie…", self.browser)
+                token = extract_kodekloud_from_user_profile(
+                    browser=self.browser,
+                    wait_seconds=18,
+                    close_after=True,
+                    start_url=self.page_url,
+                )
+                log.info("已通过 CDP 从真实配置提取 session-cookie")
+                return {"session-cookie": token}
+            except Exception as e:
+                raise RuntimeError(
+                    f"CDP 提取 KodeKloud session-cookie 失败: {e}\n\n"
+                    "备选：\n"
+                    "  1) Cookie 来源选「KodeKloud 自动提取 Token」并在弹出窗口登录\n"
+                    "  2) Brave F12 → Application → Cookies → 复制 session-cookie 到剪贴板"
+                ) from e
+
+        # 回退：browser_cookie3（部分环境需要管理员）
         try:
             import browser_cookie3  # type: ignore
 
@@ -328,8 +579,8 @@ class CookieManager:
             if not loader:
                 raise ValueError(f"不支持的浏览器: {self.browser}")
 
-            domain = self.domain_filter or ""
-            jar = loader(domain_name=f".{domain}" if domain else "")
+            domain_name = self.domain_filter or ""
+            jar = loader(domain_name=f".{domain_name}" if domain_name else "")
             cookies = {c.name: c.value for c in jar}
             if not cookies:
                 raise RuntimeError(f"未找到 Cookie，请先在该浏览器中登录目标网站")
@@ -337,3 +588,14 @@ class CookieManager:
             return cookies
         except ImportError:
             raise RuntimeError("请先安装 browser-cookie3 以支持此浏览器: pip install browser-cookie3")
+        except Exception as e:
+            msg = str(e)
+            if "admin" in msg.lower() or (native_err and "占用" in str(native_err)):
+                raise RuntimeError(
+                    f"从 {self.browser} 读取 Cookie 失败（浏览器占用或需管理员）。\n"
+                    "请改用：\n"
+                    "  1) 完全退出 Brave 后再选「Brave 浏览器」下载\n"
+                    "  2) Cookie 来源选「KodeKloud 自动提取 Token」\n"
+                    "  3) Brave F12 → Application → Cookies → 复制 session-cookie 到剪贴板"
+                ) from e
+            raise
